@@ -268,6 +268,7 @@ function renderNav() {
   const nav = $('nav');
   nav.replaceChildren(...tabButtons('navbtn'));
   nav.hidden = state.active === 'add' || !findLeague(state.active);
+  nav.classList.remove('away');
 }
 
 function setTab(tab) {
@@ -621,8 +622,6 @@ function controls(label, ic, meta, week, setWeek) {
   );
 }
 
-const segBar = () => h('div', { class: 'segbar', role: 'group', 'aria-label': 'View' }, ...tabButtons('seg'));
-
 /** Bottom-of-page link that downloads a build brief to hand to ChatGPT. */
 const makeOwn = () =>
   h('div', { class: 'ownrow' }, h('a', { class: 'btn ghost own', href: 'make-your-own.md', download: 'blindside-make-your-own.md', text: 'Make this my own' }));
@@ -635,27 +634,24 @@ function renderLeague(lg, meta, d) {
     state.weekByLeague[lg.leagueId] = w;
     loadLeague(lg);
   });
-  const tabs = segBar();
   const watched = loadWatched(lg.season, week);
   state.view = { lg, meta, data: d, watched, tab: state.tab };
 
   if (state.tab === 'league') {
     main().replaceChildren(
       ctrl,
-      tabs,
       h('section', { class: 'card' }, h('h2', { text: 'Matchups' }), h('div', { class: 'mlist', id: 'mlist' })),
       h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' })),
       makeOwn()
     );
   } else if (!d.matchup) {
     state.view = null;
-    main().replaceChildren(ctrl, tabs, h('section', { class: 'card' }, h('p', { class: 'muted', text: `${lg.teamName} has no matchup in week ${week}.` })), makeOwn());
+    main().replaceChildren(ctrl, h('section', { class: 'card' }, h('p', { class: 'muted', text: `${lg.teamName} has no matchup in week ${week}.` })), makeOwn());
     return;
   } else {
     main().replaceChildren(
       ctrl,
       h('section', { class: 'matchup', id: 'matchup' }),
-      tabs,
       state.tab === 'games'
         ? h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' }))
         : h('section', { class: 'card' }, h('h2', { text: 'Starting lineups' }), h('div', { class: 'lineup', id: 'lineup' })),
@@ -940,6 +936,31 @@ $('btn-refresh').addEventListener('click', () => {
   if (lg) loadLeague(lg, { force: true });
 });
 $('btn-settings').addEventListener('click', openSettingsSheet);
+
+/* ---------- bottom nav: hides while scrolling down, returns on scroll up ---------- */
+{
+  let lastY = window.scrollY;
+  let queued = false;
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const y = Math.max(0, window.scrollY);
+        const dy = y - lastY;
+        const atTop = y < 80;
+        const atBottom = y + window.innerHeight >= document.documentElement.scrollHeight - 4;
+        const nav = $('nav');
+        if (atTop || atBottom || dy < -6) nav.classList.remove('away');
+        else if (dy > 6) nav.classList.add('away');
+        if (Math.abs(dy) > 6 || atTop) lastY = y; // ignore jitter so slow scrolls still add up
+      });
+    },
+    { passive: true }
+  );
+}
 
 /* ---------- boot ---------- */
 function boot() {

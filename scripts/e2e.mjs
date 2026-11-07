@@ -30,6 +30,11 @@ const consoleMsgs = [];
 page.on('console', (m) => consoleMsgs.push(m.text()));
 page.on('dialog', (d) => d.accept());
 const shot = async (name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png` });
+// The bottom nav hides while scrolling down, so go back to the top before using it.
+const navTab = async (t) => {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator(`.navbtn[data-tab=${t}]`).click();
+};
 
 await page.goto(BASE);
 await page.waitForSelector('.teambtn', { timeout: 20000 });
@@ -57,10 +62,10 @@ const cardText = await page.locator('#matchup').innerText();
 ok(!/hidden|null|undefined/i.test(cardText), `matchup card has no placeholder/"Hidden"/null text (${cardText.replace(/\n/g, ' | ')})`);
 ok((await page.locator('#matchup .mfoot').innerText()).includes('0 / 9'), 'progress shows 0 / 9 games revealed');
 ok((await page.locator('.result').count()) === 0, 'no result banner while games remain');
-await page.locator('.segbar .seg[data-tab=lineups]').click();
+await navTab('lineups');
 const hiddenTexts = await page.locator('.pl .p').allInnerTexts();
 ok(hiddenTexts.every((t) => t === 'BYE'), `lineups show no player points (${hiddenTexts.join(',')})`);
-await page.locator('.segbar .seg[data-tab=games]').click();
+await navTab('games');
 await waitWeek('8');
 const seenBefore = await page.evaluate(() => window.__seen.join('\n'));
 ok(!/\b\d{1,3}\.\d{1,2}\b/.test(seenBefore), 'no decimal numbers ever entered the DOM before ticking (no flash)');
@@ -76,10 +81,10 @@ await page.locator('.game', { hasText: 'TEN @ CIN' }).click();
 const [m1, o1] = await pts();
 ok(m1 === '49.48' && o1 === '37.70', `ticking TEN@CIN reveals only that game (me ${m1}, opp ${o1}; expected 49.48 / 37.70)`);
 ok((await page.locator('#matchup .mfoot').innerText()).includes('1 / 9') && (await page.locator('#matchup .pct').innerText()) === '11%', 'progress 1 / 9, 11%');
-await page.locator('.segbar .seg[data-tab=lineups]').click();
+await navTab('lineups');
 const revealed = await page.locator('.pl .p.rev').allInnerTexts();
 ok(revealed.length === 3, `exactly 3 players revealed (got ${revealed.length}: ${revealed.join(',')})`);
-await page.locator('.segbar .seg[data-tab=games]').click();
+await navTab('games');
 await waitWeek('8');
 const left1 = await page.locator('#matchup .left').allInnerTexts();
 ok(left1[0] === '8 players left' && left1[1] === '7 players left', `players left update after tick (${left1.join(' | ')})`);
@@ -94,6 +99,22 @@ ok((await page.locator('.game', { hasText: 'TEN @ CIN' }).count()) === 0 && (awa
 await shot('3b-hide-watched');
 await page.click('#btn-hide');
 ok((await page.locator('.game').count()) === 9, 'Show watched brings them back');
+ok((await page.locator('.segbar, .seg').count()) === 0, 'no in-page tab bar (the bottom nav replaces it)');
+// Bottom nav: hides on scroll down, returns on scroll up.
+await page.setViewportSize({ width: 412, height: 560 });
+await page.evaluate(() => window.scrollTo(0, 0));
+const navAway = () => page.locator('#nav').evaluate((el) => el.classList.contains('away'));
+await page.waitForTimeout(150);
+ok(!(await navAway()), 'bottom nav is visible at the top');
+await page.evaluate(() => window.scrollBy(0, 300));
+await page.waitForTimeout(350);
+ok(await navAway(), 'bottom nav slides away when scrolling down');
+await page.evaluate(() => window.scrollBy(0, -120));
+await page.waitForTimeout(350);
+ok(!(await navAway()), 'bottom nav returns when scrolling up');
+await page.setViewportSize({ width: 412, height: 915 });
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.waitForTimeout(150);
 const eye = page.locator('#btn-hide');
 ok((await eye.locator('svg').count()) === 1 && (await eye.innerText()).trim() === '', 'hide-watched is an eye icon with no text');
 const own = page.locator('a.own');
@@ -129,7 +150,7 @@ await page.click('#btn-reset');
 ok((await pts()).length === 0, 'reset hides everything again');
 
 // League view: every matchup, same watched set.
-await page.locator('.segbar .seg[data-tab=league]').click();
+await navTab('league');
 await page.waitForSelector('#mlist .mcard', { timeout: 30000 });
 ok((await page.locator('#mlist .mcard').count()) === 5, 'league view lists all 5 matchups');
 ok((await page.locator('#mlist .pts').count()) === 0, 'league view shows no scores before ticking');
@@ -145,7 +166,7 @@ ok(leagueFits, 'league matchup cards and scores fit the screen width');
 await page.evaluate(() => window.scrollTo(0, 0));
 await shot('6-league');
 await page.click('#btn-reset');
-await page.locator('.segbar .seg[data-tab=games]').click();
+await navTab('games');
 await waitWeek('8');
 
 // Second league (superflex)
@@ -168,9 +189,9 @@ await page.click('#btn-all');
 const [m3, o3] = await pts();
 ok(m3 === '102.20' && o3 === '148.40', `superflex totals 102.20 vs 148.40 (got ${m3} vs ${o3})`);
 await page.click('#btn-reset');
-await page.locator('.segbar .seg[data-tab=lineups]').click();
+await navTab('lineups');
 ok((await page.locator('.slot', { hasText: 'SFLX' }).count()) === 1, 'superflex slot shown');
-await page.locator('.segbar .seg[data-tab=games]').click();
+await navTab('games');
 await waitWeek('8');
 await shot('5-superflex');
 
