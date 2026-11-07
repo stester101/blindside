@@ -60,11 +60,6 @@ h2 { font-size: 12px; font-weight: 600; margin: 0 0 8px; color: var(--muted); te
 .btn:disabled { opacity: .45; }
 .row { display: flex; gap: 8px; align-items: center; }
 .grow { flex: 1; min-width: 0; }
-.chip {
-  height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line);
-  background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap;
-}
-.chip[aria-pressed="true"] { background: var(--card2); color: var(--text); border-color: var(--accent); }
 
 /* Setup */
 .field { width: 100%; min-height: var(--tap); padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 17px; }
@@ -167,3 +162,11 @@ h2 { font-size: 12px; font-weight: 600; margin: 0 0 8px; color: var(--muted); te
 }
 .actions .btn { min-height: 44px; }
 .actions .btn.primary { flex: 1; max-width: 340px; }
+
+/* Eye icon (hide/show watched games) */
+.iconbtn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 0; }
+.iconbtn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+/* "Make this my own" at the very bottom, right-aligned */
+.ownrow { display: flex; justify-content: flex-end; padding: 4px 0 12px; }
+.btn.own { display: inline-flex; align-items: center; min-height: 36px; font-size: 13px; color: var(--muted); text-decoration: none; }

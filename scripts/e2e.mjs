@@ -86,6 +86,12 @@ ok((await page.locator('.game', { hasText: 'TEN @ CIN' }).count()) === 0 && (awa
 await shot('3b-hide-watched');
 await page.click('#btn-hide');
 ok((await page.locator('.game').count()) === 9, 'Show watched brings them back');
+const eye = page.locator('#btn-hide');
+ok((await eye.locator('svg').count()) === 1 && (await eye.innerText()).trim() === '', 'hide-watched is an eye icon with no text');
+const own = page.locator('a.own');
+ok((await own.innerText()) === 'Make this my own' && (await own.getAttribute('download')) === 'blindside-make-your-own.md', '"Make this my own" download link at the bottom');
+const md = await page.evaluate(async () => (await fetch('make-your-own.md')).text());
+ok(md.includes('requestedGames') && md.includes('Access-Control-Allow-Origin') && !/\b\d{1,3}\.\d{2}\b/.test(md), 'build brief downloads with API notes and no scores');
 await shot('3-one-game');
 
 // Persisted across reload

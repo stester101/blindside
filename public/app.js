@@ -383,12 +383,13 @@ function renderLeague(lg, meta, d) {
       ...head,
       h('section', { class: 'card' }, h('h2', { text: 'Matchups' }), h('div', { class: 'mlist', id: 'mlist' })),
       h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' })),
-      manage
+      manage,
+      makeOwn()
     );
   } else if (!d.matchup) {
     state.view = null;
     $('actions').hidden = true;
-    main().replaceChildren(...head, h('section', { class: 'card' }, h('p', { class: 'muted', text: `${lg.teamName} has no matchup in week ${week}.` })), manage);
+    main().replaceChildren(...head, h('section', { class: 'card' }, h('p', { class: 'muted', text: `${lg.teamName} has no matchup in week ${week}.` })), manage, makeOwn());
     return;
   } else {
     state.view = { lg, meta, data: d, watched, mode: 'mine' };
@@ -397,7 +398,8 @@ function renderLeague(lg, meta, d) {
       h('section', { class: 'card matchup', id: 'matchup' }),
       h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' })),
       h('section', { class: 'card' }, h('h2', { text: 'Starting lineups' }), h('div', { class: 'lineup', id: 'lineup' })),
-      manage
+      manage,
+      makeOwn()
     );
   }
   $('actions').hidden = false;
@@ -448,27 +450,36 @@ function visibleGames(games, watched) {
   return state.hideWatched ? sorted.filter((g) => !watched.has(g.id)) : sorted;
 }
 
-/** Card header with a show/hide-watched chip. */
+// Static icons (no data ever goes through innerHTML).
+const ICON_EYE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 7 11 7a18.6 18.6 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+/** Card header with an eye icon that hides/shows games already watched. */
 function gamesHead(title) {
-  return h(
-    'div',
-    { class: 'cardhead' },
-    h('h2', { text: title }),
-    h('button', {
-      class: 'chip',
-      id: 'btn-hide',
-      type: 'button',
-      'aria-pressed': String(state.hideWatched),
-      text: 'Hide watched',
-      onclick: (e) => {
-        state.hideWatched = !state.hideWatched;
-        store.set('hideWatched', state.hideWatched);
-        e.currentTarget.setAttribute('aria-pressed', String(state.hideWatched));
-        paint();
-      },
-    })
-  );
+  const btn = h('button', { class: 'iconbtn', id: 'btn-hide', type: 'button' });
+  const sync = () => {
+    btn.setAttribute('aria-pressed', String(state.hideWatched));
+    btn.setAttribute('aria-label', state.hideWatched ? 'Show watched games' : 'Hide watched games');
+    btn.title = btn.getAttribute('aria-label');
+    btn.innerHTML = state.hideWatched ? ICON_EYE_OFF : ICON_EYE;
+  };
+  sync();
+  btn.addEventListener('click', () => {
+    state.hideWatched = !state.hideWatched;
+    store.set('hideWatched', state.hideWatched);
+    sync();
+    paint();
+  });
+  return h('div', { class: 'cardhead' }, h('h2', { text: title }), btn);
 }
+
+/** Bottom-of-page link that downloads a build brief to hand to ChatGPT. */
+const makeOwn = () =>
+  h(
+    'div',
+    { class: 'ownrow' },
+    h('a', { class: 'btn ghost own', href: 'make-your-own.md', download: 'blindside-make-your-own.md', text: 'Make this my own' })
+  );
 
 function renderGameList(games, watched, detailFor, emptyText) {
   const list = visibleGames(games, watched);
