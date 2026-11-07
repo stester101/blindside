@@ -14,7 +14,7 @@ const ok = (cond, msg) => {
 
 const browser = await chromium.launch();
 // Galaxy Z Flip 6 main screen is ~412 CSS px wide.
-const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: SHOTS ? 2 : 1, isMobile: true, hasTouch: true });
+const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: SHOTS ? 2 : 1, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
 // Record every text value that ever enters the DOM, to catch spoiler "flashes".
 await ctx.addInitScript(() => {
   window.__seen = [];
@@ -275,6 +275,30 @@ const manifest = await page.evaluate(async () => (await fetch('manifest.webmanif
 ok(manifest.icons?.some((i) => i.sizes === '512x512'), 'manifest has 512px icon');
 const swReg = await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()));
 ok(swReg, 'service worker registered');
+
+// Score spin: with motion allowed, totals roll like slot reels and land on the exact value.
+const ctx2 = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+const pg2 = await ctx2.newPage();
+await pg2.goto(BASE);
+await pg2.evaluate(() => {
+  localStorage.setItem('blindside:v1:leagues', JSON.stringify([{ leagueId: '219707', season: 2026, leagueName: 'Falcon Money League', teamId: 1400091, teamName: 'Chase Spunk' }]));
+  localStorage.setItem('blindside:v1:watched:2026:8', JSON.stringify([7965]));
+});
+await pg2.reload();
+await pg2.waitForSelector('#matchup .mside.me .pts', { timeout: 20000 });
+const frames = new Set();
+const until = Date.now() + 700;
+while (Date.now() < until) {
+  frames.add(await pg2.locator('#matchup .mside.me .pts').innerText());
+  await pg2.waitForTimeout(40);
+}
+ok(frames.size >= 4, `score digits roll while spinning up (${frames.size} distinct frames)`);
+await pg2.waitForTimeout(1300);
+const finalMe = await pg2.locator('#matchup .mside.me .pts').innerText();
+const finalOpp = await pg2.locator('#matchup .mside.opp .pts').innerText();
+ok(finalMe === '49.48' && finalOpp === '37.70', `the spin lands on the exact totals (${finalMe} / ${finalOpp})`);
+ok(!(await pg2.locator('#matchup .pts.spinning').count()), 'spinning state is cleared afterwards');
+await ctx2.close();
 
 await browser.close();
 console.log(failures.length ? `\n${failures.length} FAILED` : '\nALL PASSED');

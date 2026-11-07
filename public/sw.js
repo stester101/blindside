@@ -1,5 +1,5 @@
 // App-shell cache only. /api/* is never cached here: always fresh, never stored on disk by us.
-const VERSION = 'blindside-v15';
+const VERSION = 'blindside-v16';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'parse.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

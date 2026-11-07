@@ -81,6 +81,10 @@ Open the URL in Chrome → **⋮** menu → **Add to home screen** → **Install
 
 **Sharing with league mates:** send them `https://<your-url>/?league=<their league id>`. That pre-fills the league ID so they just tap their own team. Nothing in the app is tied to one person.
 
+## Score animation
+
+Score totals spin like slot-machine reels and lock in left to right when they change; only the digits that change roll. It respects the phone's "reduce motion" setting, in which case numbers just appear.
+
 ## "Make this my own"
 
 The button at the bottom of the app downloads `public/make-your-own.md`. It's a self-contained build brief (features, the CORS proxy code, the real Fleaflicker API shapes, the spoiler rules and deploy steps) that anyone can hand to ChatGPT or another assistant to build and customise their own copy.

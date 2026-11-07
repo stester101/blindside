@@ -267,3 +267,6 @@ button.amrow:active { border-color: var(--accent); }
   .tag { font-size: 10px; }
   .lineup { grid-template-columns: 1fr 28px 1fr; }
 }
+
+/* Score totals spin like slot reels when they change */
+.pts.spinning, .amscore .spinning { text-shadow: 0 0 14px currentColor; }

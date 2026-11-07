@@ -67,6 +67,7 @@ const state = {
   view: null, // current rendered league view
   tab: 'games', // 'games' | 'lineups' | 'league'
   hideWatched: store.get('hideWatched', false) === true,
+  shown: new Map(), // score key -> last value shown, so only changes spin
   linger: new Map(), // gameId -> {timer, started}: just-watched games kept visible briefly while hiding watched
   seq: 0,
 };
@@ -148,6 +149,72 @@ function icon(name, size = 20) {
 }
 
 const fmtTotal = (n) => n.toFixed(2);
+
+/* ---------- score "slot machine" spin ---------- */
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+/**
+ * Roll the digits of `finalStr` like slot reels: digits that already match `fromStr` stay put, the rest
+ * spin upwards and lock in left to right. The element always ends on the exact value.
+ */
+function runSpin(el, finalStr, fromStr) {
+  const len = finalStr.length;
+  const from = fromStr.padStart(len, '0');
+  const digitAt = [];
+  for (let i = 0; i < len; i++) if (/\d/.test(finalStr[i])) digitAt.push(i);
+  const firstDiff = digitAt.findIndex((i) => finalStr[i] !== from[i]);
+  if (firstDiff < 0) return;
+  const reels = digitAt.length - firstDiff;
+  const MS = 1100;
+  const t0 = performance.now();
+  el.classList.add('spinning');
+  const draw = (now) => {
+    const p = Math.min(1, (now - t0) / MS);
+    let out = '';
+    for (let i = 0; i < len; i++) {
+      const c = finalStr[i];
+      const k = digitAt.indexOf(i);
+      if (k < firstDiff || p >= 1) {
+        out += c;
+        continue;
+      }
+      const lock = 0.3 + 0.7 * ((k - firstDiff + 1) / reels); // left reels settle first
+      if (p >= lock) out += c;
+      else out += String((((+c - Math.floor((lock - p) * 40)) % 10) + 10) % 10); // counting up into place
+    }
+    el.textContent = out;
+    if (p < 1 && el.isConnected) requestAnimationFrame(draw);
+    else {
+      el.textContent = finalStr;
+      el.classList.remove('spinning');
+    }
+  };
+  draw(t0);
+  requestAnimationFrame(draw);
+}
+
+/** Show `value` in `el`, spinning from whatever this score showed last (or from 0 the first time). */
+function spinTo(el, key, value) {
+  const prev = state.shown.get(key);
+  state.shown.set(key, value);
+  const finalStr = fmtTotal(value);
+  el.textContent = finalStr;
+  if (prevOrSkip(prev, value)) return;
+  runSpin(el, finalStr, fmtTotal(prev ?? 0));
+}
+// Skip for reduced motion, unchanged values, decreases and negatives (those just snap).
+const prevOrSkip = (prev, value) => prefersReducedMotion() || value < 0 || (prev != null && (value <= prev || prev < 0));
+
+/** A score element, or null (and forget its last value) while that score is still hidden. */
+function scoreEl(tag, cls, key, value, show) {
+  if (!show) {
+    state.shown.delete(key);
+    return null;
+  }
+  const el = h(tag, { class: cls });
+  spinTo(el, key, value);
+  return el;
+}
 const fmtPts = (n) => String(Math.round(n * 100) / 100);
 const fmtKick = (ms) =>
   ms ? new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
@@ -567,7 +634,9 @@ function paintAll(v) {
           h('div', { class: 'amvs' }, h('b', { class: 'me', text: d.matchup.myName }), ' vs ', h('span', { class: 'opp', text: d.matchup.oppName })),
           h('div', { class: 'amsub', text: `${lg.leagueName} · ${leftText(playersLeft(d.model, 'me', watched))}` })
         ),
-        r.anyWatched ? h('div', { class: 'amscore' }, h('span', { class: 'me', text: fmtTotal(r.me) }), ' – ', h('span', { class: 'opp', text: fmtTotal(r.opp) })) : null,
+        r.anyWatched
+          ? h('div', { class: 'amscore' }, scoreEl('span', 'me', `a:${lg.leagueId}:${v.week}:me`, r.me, true), ' – ', scoreEl('span', 'opp', `a:${lg.leagueId}:${v.week}:opp`, r.opp, true))
+          : (state.shown.delete(`a:${lg.leagueId}:${v.week}:me`), state.shown.delete(`a:${lg.leagueId}:${v.week}:opp`), null),
         verdict ? h('span', { class: `wl ${verdict[1]}`, text: verdict[0] }) : null
       );
     })
@@ -673,14 +742,14 @@ const leftText = (n) => (n ? `${n} player${n === 1 ? '' : 's'} left` : 'All watc
  * Compact scoreboard rows (league view): one row per team, name + players left on the left,
  * score on the right. A score only appears once at least one of that matchup's games is watched.
  */
-function scoreRows(model, names, watched) {
+function scoreRows(model, names, watched, keyBase) {
   const r = computeReveal(model, watched);
   const row = (side, name, pts) =>
     h(
       'div',
       { class: `srow ${side}` },
       h('div', { class: 'sname' }, h('div', { class: 'tname', text: name }), h('div', { class: 'left', text: leftText(playersLeft(model, side, watched)) })),
-      r.anyWatched ? h('div', { class: 'pts sm', text: fmtTotal(pts) }) : null
+      scoreEl('div', 'pts sm', `${keyBase}:${side}`, pts, r.anyWatched)
     );
   return { r, rows: [row('me', names[0], r.me), row('opp', names[1], r.opp)] };
 }
@@ -703,14 +772,14 @@ function resultBanner(r) {
 }
 
 /** The big matchup card: names, revealed scores, players left, and watch progress. */
-function matchupNodes(model, matchup, watched) {
+function matchupNodes(model, matchup, watched, keyBase) {
   const r = computeReveal(model, watched);
   const side = (cls, name, pts, key) =>
     h(
       'div',
       { class: `mside ${cls}` },
       h('div', { class: 'mname', text: name }),
-      r.anyWatched ? h('div', { class: 'pts', text: fmtTotal(pts) }) : null,
+      scoreEl('div', 'pts', `${keyBase}:${key}`, pts, r.anyWatched),
       h('div', { class: 'left', text: leftText(playersLeft(model, key, watched)) })
     );
   const pct = r.total ? Math.round((r.watchedCount / r.total) * 100) : 0;
@@ -837,7 +906,7 @@ function paint() {
   const { lg, data, watched } = v;
   const { model, matchup } = data;
 
-  const { r, nodes } = matchupNodes(model, matchup, watched);
+  const { r, nodes } = matchupNodes(model, matchup, watched, `m:${lg.leagueId}:${data.week}`);
   $('matchup').replaceChildren(...nodes);
   store.set(doneKey(lg, data.week), r.allWatched && r.allFinal);
 
@@ -896,7 +965,7 @@ function paintLeague(v) {
   const mineFirst = [...data.league].sort((a, b) => (b.fantasyGameId === data.matchup?.fantasyGameId) - (a.fantasyGameId === data.matchup?.fantasyGameId));
   $('mlist').replaceChildren(
     ...mineFirst.map((m) => {
-      const { r, rows } = scoreRows(m.model, [m.awayName, m.homeName], watched);
+      const { r, rows } = scoreRows(m.model, [m.awayName, m.homeName], watched, `l:${lg.leagueId}:${data.week}:${m.fantasyGameId}`);
       const mine = m.awayId === lg.teamId || m.homeId === lg.teamId;
       // Highlight the leader only once that matchup is fully watched.
       const lead = r.allWatched && r.me !== r.opp ? (r.me > r.opp ? 'me' : 'opp') : null;
