@@ -59,6 +59,8 @@ ok((await page.locator('.result').innerText()).includes('locked'), 'result locke
 const seenBefore = await page.evaluate(() => window.__seen.join('\n'));
 ok(!/\b\d{1,3}\.\d{1,2}\b/.test(seenBefore), 'no decimal numbers ever entered the DOM before ticking (no flash)');
 const nGames = await page.locator('.game').count();
+const leftTxt = await page.locator('#matchup .left').allInnerTexts();
+ok(leftTxt[0].includes('9 left to watch') && leftTxt[1].includes('9 left to watch'), `players left shown before ticking (${leftTxt.join(' | ').replace(/\n/g, ' ')})`);
 ok(nGames === 9, `week 8 shows 9 relevant NFL games (got ${nGames})`);
 
 // Tick TEN @ CIN: my Burrow 49.48 (QB) and opp C. Brown 12.1 + J. Chase 25.6 played there.
@@ -68,6 +70,8 @@ ok(m1 === '49.48' && o1 === '37.70', `ticking TEN@CIN reveals only that game (me
 const revealed = await page.locator('.pl .p.rev').allInnerTexts();
 ok(revealed.length === 3, `exactly 3 players revealed (got ${revealed.length}: ${revealed.join(',')})`);
 ok((await page.locator('.result').innerText()).includes('8 games left'), 'result still locked with 8 games left');
+const left1 = await page.locator('#matchup .left').allInnerTexts();
+ok(left1[0].includes('8 left') && left1[1].includes('7 left'), `players left update after tick (${left1.join(' | ').replace(/\n/g, ' ')})`);
 const card = await page.locator('.game', { hasText: 'TEN @ CIN' }).innerText();
 ok(/J\. Burrow 49\.48/.test(card) && /C\. Brown 12\.1/.test(card) && /J\. Chase 25\.6/.test(card), 'watched game card shows each player\'s points');
 const other = await page.locator('.game', { hasText: 'CAR @ GB' }).innerText();

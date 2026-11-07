@@ -354,6 +354,26 @@ function paint() {
   const { model, matchup } = data;
   const r = computeReveal(model, watched);
 
+  // Players left: starters whose NFL game isn't ticked yet (byes/empty slots excluded).
+  // Uses only lineups, kickoff times and the watched set, never points.
+  const gameById = new Map(model.games.map((g) => [g.id, g]));
+  const leftFor = (side) => {
+    let left = 0;
+    let yet = 0;
+    for (const s of model.slots) {
+      const p = s[side];
+      if (p?.gameId == null || watched.has(p.gameId)) continue;
+      left++;
+      if (gameStatus(gameById.get(p.gameId)) === 'upcoming') yet++;
+    }
+    return h(
+      'div',
+      { class: 'left' },
+      h('div', { text: left ? `${left} left to watch` : 'All watched' }),
+      yet ? h('div', { class: 'yet', text: `${yet} yet to play` }) : null
+    );
+  };
+
   // Matchup bar
   const show = r.anyWatched;
   const sum = r.me + r.opp;
@@ -374,9 +394,9 @@ function paint() {
     h(
       'div',
       { class: 'scoreline' },
-      h('div', { class: 'side me' }, h('div', { class: 'tname', text: matchup.myName }), h('div', { class: 'pts', text: show ? fmtTotal(r.me) : PLACEHOLDER })),
+      h('div', { class: 'side me' }, h('div', { class: 'tname', text: matchup.myName }), h('div', { class: 'pts', text: show ? fmtTotal(r.me) : PLACEHOLDER }), leftFor('me')),
       h('div', { class: 'vs', text: 'vs' }),
-      h('div', { class: 'side opp right' }, h('div', { class: 'tname', text: matchup.oppName }), h('div', { class: 'pts', text: show ? fmtTotal(r.opp) : PLACEHOLDER }))
+      h('div', { class: 'side opp right' }, h('div', { class: 'tname', text: matchup.oppName }), h('div', { class: 'pts', text: show ? fmtTotal(r.opp) : PLACEHOLDER }), leftFor('opp'))
     ),
     h('div', { class: 'bar', 'aria-hidden': 'true' }, h('i', { class: 'm', style: `width:${mPct}%` }), h('i', { class: 'o', style: `width:${oPct}%` })),
     h('div', { class: 'small muted center', text: `${r.watchedCount} of ${r.total} games watched` }),
