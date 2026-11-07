@@ -107,7 +107,7 @@ const overflow = await page.evaluate(() => document.documentElement.scrollWidth 
 ok(!overflow, 'no horizontal scroll at 320px');
 
 ok(consoleMsgs.length === 0, `no console output (${consoleMsgs.length})`);
-const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();
+const manifest = await page.evaluate(async () => (await fetch('manifest.webmanifest')).json());
 ok(manifest.icons?.some((i) => i.sizes === '512x512'), 'manifest has 512px icon');
 const swReg = await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()));
 ok(swReg, 'service worker registered');
