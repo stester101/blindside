@@ -208,7 +208,7 @@ ok((await tenCin.locator('.lgline').count()) === 2, 'TEN @ CIN lists my players 
 ok(/\d+ of yours/.test(await tenCin.innerText()) && !/\d+\.\d/.test(await tenCin.innerText()), 'card says how many are yours and shows no points yet');
 await tenCin.click();
 const cinText = await tenCin.innerText();
-ok(/Burrow 49\.48/.test(cinText) && /Brown 12\.1/.test(cinText) && !/Opp/.test(cinText), 'one tick reveals my players in both leagues (no opponents)');
+ok(/Burrow 49\.48/.test(cinText) && /Brown 12\.1/.test(cinText) && /Chase 25\.6/.test(cinText) && /Higgins 37\.5/.test(cinText) && /Opp/.test(cinText), 'one tick reveals my players and the opponents in both leagues');
 const amText = await page.locator('#amlist').innerText();
 ok(/49\.48/.test(amText) && /37\.70/.test(amText) && /12\.10/.test(amText) && /37\.50/.test(amText), "each league's matchup score builds up");
 ok((await page.locator('#amlist .wl').count()) === 0, 'no W/L while games remain');

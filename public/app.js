@@ -572,16 +572,13 @@ function paintAll(v) {
   renderGameList(
     games,
     watched,
-    (g) => {
-      // Only my own players here (opponents are in each league's own view).
-      const mine = (byGame.get(g.id) ?? []).filter((e) => e.me.length);
-      if (!mine.length) return h('div', { class: 'lgs dim', text: 'Only opponents in this game' });
-      return h(
+    (g) =>
+      h(
         'div',
         { class: 'lgs' },
-        ...mine.map((e) => h('div', { class: 'lgline' }, h('span', { class: 'lgname', text: e.lg.leagueName }), h('span', { class: 'm' }, playerList(e.me, watched.has(g.id)))))
-      );
-    },
+        // Same You (green) | Opp (orange) lines as the single-league view, one block per league.
+        ...(byGame.get(g.id) ?? []).map((e) => h('div', { class: 'lgline' }, h('div', { class: 'lgname', text: e.lg.leagueName }), whoLine(e, watched.has(g.id))))
+      ),
     'No NFL games this week.',
     (g) => {
       const n = (byGame.get(g.id) ?? []).reduce((t, e) => t + e.me.length, 0);
