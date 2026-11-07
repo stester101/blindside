@@ -390,10 +390,35 @@ function paint() {
     if (s.me?.gameId != null) byGame.get(s.me.gameId)?.me.push(s.me.name);
     if (s.opp?.gameId != null) byGame.get(s.opp.gameId)?.opp.push(s.opp.name);
   }
+  const whoLine = (who, bench) =>
+    h(
+      'div',
+      { class: 'who' },
+      who.me.length ? h('span', { class: 'm', text: `You${bench ? ' (bench)' : ''}: ${who.me.join(', ')}` }) : null,
+      who.me.length && who.opp.length ? ' · ' : null,
+      who.opp.length ? h('span', { class: 'o', text: `Opp${bench ? ' (bench)' : ''}: ${who.opp.join(', ')}` }) : null
+    );
+  const benchOnly = model.benchOnly ?? [];
+  const rows = [...model.games.map((g) => ({ g, bench: false })), ...benchOnly.map((g) => ({ g, bench: true }))].sort(
+    (a, b) => a.g.kickoff - b.g.kickoff || a.g.id - b.g.id
+  );
   $('games').replaceChildren(
-    ...(model.games.length
-      ? model.games.map((g) => {
+    ...(rows.length
+      ? rows.map(({ g, bench }) => {
           const st = gameStatus(g);
+          if (bench) {
+            return h(
+              'div',
+              { class: 'game bench' },
+              h(
+                'div',
+                {},
+                h('div', { class: 'matchupname', text: `${g.away} @ ${g.home}` }),
+                h('div', { class: 'meta', text: `${st === 'upcoming' ? 'Kicks off ' + fmtKick(g.kickoff) : fmtKick(g.kickoff)} · Bench only, doesn't affect the score` }),
+                whoLine(g, true)
+              )
+            );
+          }
           const on = watched.has(g.id);
           const who = byGame.get(g.id);
           return h(
@@ -413,13 +438,7 @@ function paint() {
                 class: 'meta',
                 text: st === 'upcoming' ? `Kicks off ${fmtKick(g.kickoff)}` : st === 'live' ? 'In progress · points so far' : `${fmtKick(g.kickoff)} · Final`,
               }),
-              h(
-                'div',
-                { class: 'who' },
-                who.me.length ? h('span', { class: 'm', text: `You: ${who.me.join(', ')}` }) : null,
-                who.me.length && who.opp.length ? ' · ' : null,
-                who.opp.length ? h('span', { class: 'o', text: `Opp: ${who.opp.join(', ')}` }) : null
-              )
+              whoLine(who, false)
             ),
             h('span', { class: 'toggle', 'aria-hidden': 'true' })
           );

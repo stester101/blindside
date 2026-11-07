@@ -102,8 +102,24 @@ export function parseBoxscore(raw, teamId) {
   // Only games that involve a starter matter for the matchup.
   const used = new Set();
   for (const s of slots) for (const p of [s.me, s.opp]) if (p?.gameId != null) used.add(p.gameId);
-  const relevant = [...games.values()].filter((g) => used.has(g.id)).sort((a, b) => a.kickoff - b.kickoff || a.id - b.id);
-  return { slots, games: relevant };
+  const byKick = (a, b) => a.kickoff - b.kickoff || a.id - b.id;
+  const relevant = [...games.values()].filter((g) => used.has(g.id)).sort(byKick);
+
+  // Games where only bench/IR players play: listed for context, never scored.
+  // Bench points are not kept at all (they never affect the matchup).
+  const bench = new Map();
+  for (const l of lineups) {
+    if (l === starters) continue;
+    for (const s of l.slots ?? []) {
+      for (const [side, who] of [[mySide, 'me'], [oppSide, 'opp']]) {
+        const p = parsePlayer(s[side], games);
+        if (p?.gameId == null || used.has(p.gameId)) continue;
+        if (!bench.has(p.gameId)) bench.set(p.gameId, { ...games.get(p.gameId), me: [], opp: [] });
+        bench.get(p.gameId)[who].push(p.name);
+      }
+    }
+  }
+  return { slots, games: relevant, benchOnly: [...bench.values()].sort(byKick) };
 }
 
 /** Compute what may be shown, given the set of watched NFL game ids. */
