@@ -48,6 +48,7 @@ const state = {
   cache: new Map(), // `${leagueId}:${season}:${teamId}:${week}` -> view data (in memory only)
   view: null, // current rendered league view data
   mode: 'mine', // 'mine' | 'league'
+  hideWatched: store.get('hideWatched', false) === true,
   seq: 0,
 };
 
@@ -367,12 +368,12 @@ function modeSwitch(lg) {
         loadLeague(lg);
       },
     });
-  return h('div', { class: 'segbar', role: 'group', 'aria-label': 'View' }, btn('mine', 'My matchup'), btn('league', 'League'));
+  return h('div', { class: 'segbar', role: 'group', 'aria-label': 'View' }, btn('mine', 'Mine'), btn('league', 'League'));
 }
 
 function renderLeague(lg, meta, d) {
   const { week } = d;
-  const head = [weekBar(lg, meta, week), modeSwitch(lg)];
+  const head = [h('div', { class: 'controls' }, weekBar(lg, meta, week), modeSwitch(lg))];
   const manage = h('section', { class: 'card' }, h('h2', { text: lg.leagueName }), h('div', { class: 'manage' }, manageButtons(lg)));
   const watched = loadWatched(lg, week);
 
@@ -381,7 +382,7 @@ function renderLeague(lg, meta, d) {
     main().replaceChildren(
       ...head,
       h('section', { class: 'card' }, h('h2', { text: 'Matchups' }), h('div', { class: 'mlist', id: 'mlist' })),
-      h('section', { class: 'card' }, h('h2', { text: 'NFL games' }), h('div', { class: 'games', id: 'games' })),
+      h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' })),
       manage
     );
   } else if (!d.matchup) {
@@ -394,7 +395,7 @@ function renderLeague(lg, meta, d) {
     main().replaceChildren(
       ...head,
       h('section', { class: 'card matchup', id: 'matchup' }),
-      h('section', { class: 'card' }, h('h2', { text: 'NFL games' }), h('div', { class: 'games', id: 'games' })),
+      h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' })),
       h('section', { class: 'card' }, h('h2', { text: 'Starting lineups' }), h('div', { class: 'lineup', id: 'lineup' })),
       manage
     );
@@ -441,10 +442,41 @@ function statusLine(r, { mine }) {
   return h('div', { class: 'result', text: r.allFinal ? 'Tie' : `Tied${tail}` });
 }
 
-/** Order: games you can watch now, then not-yet-started, then already watched. */
-function orderGames(games, watched) {
-  const rank = (g) => (watched.has(g.id) ? 2 : gameStatus(g) === 'upcoming' ? 1 : 0);
-  return [...games].sort((a, b) => rank(a) - rank(b) || a.kickoff - b.kickoff || a.id - b.id);
+/** Kickoff order; optionally drop games already watched. */
+function visibleGames(games, watched) {
+  const sorted = [...games].sort((a, b) => a.kickoff - b.kickoff || a.id - b.id);
+  return state.hideWatched ? sorted.filter((g) => !watched.has(g.id)) : sorted;
+}
+
+/** Card header with a show/hide-watched chip. */
+function gamesHead(title) {
+  return h(
+    'div',
+    { class: 'cardhead' },
+    h('h2', { text: title }),
+    h('button', {
+      class: 'chip',
+      id: 'btn-hide',
+      type: 'button',
+      'aria-pressed': String(state.hideWatched),
+      text: 'Hide watched',
+      onclick: (e) => {
+        state.hideWatched = !state.hideWatched;
+        store.set('hideWatched', state.hideWatched);
+        e.currentTarget.setAttribute('aria-pressed', String(state.hideWatched));
+        paint();
+      },
+    })
+  );
+}
+
+function renderGameList(games, watched, detailFor, emptyText) {
+  const list = visibleGames(games, watched);
+  const hidden = games.length - list.length;
+  const nodes = list.map((g) => gameCard(g, watched, detailFor(g)));
+  if (!games.length) nodes.push(h('p', { class: 'empty-note', text: emptyText }));
+  else if (!list.length) nodes.push(h('p', { class: 'empty-note', text: `All ${hidden} watched games hidden.` }));
+  $('games').replaceChildren(...nodes);
 }
 
 function gameCard(g, watched, detail) {
@@ -456,8 +488,12 @@ function gameCard(g, watched, detail) {
     h(
       'div',
       {},
-      h('div', { class: 'matchupname' }, `${g.away} @ ${g.home}`, st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : null),
-      h('div', { class: 'meta', text: st === 'upcoming' ? `Kicks off ${fmtKick(g.kickoff)}` : st === 'live' ? 'In progress' : `${fmtKick(g.kickoff)} · Final` }),
+      h(
+        'div',
+        { class: 'gtop' },
+        h('span', { class: 'matchupname', text: `${g.away} @ ${g.home}` }),
+        st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : h('span', { class: 'meta', text: st === 'upcoming' ? fmtKick(g.kickoff) : `${fmtKick(g.kickoff)} · Final` })
+      ),
       detail
     ),
     h('span', { class: 'toggle', 'aria-hidden': 'true' })
@@ -498,11 +534,7 @@ function paint() {
       who.me.length && who.opp.length ? ' · ' : null,
       who.opp.length ? h('span', { class: 'o' }, 'Opp: ', ...playerList(who.opp, revealed)) : null
     );
-  $('games').replaceChildren(
-    ...(model.games.length
-      ? orderGames(model.games, watched).map((g) => gameCard(g, watched, whoLine(byGame.get(g.id), watched.has(g.id))))
-      : [h('p', { class: 'muted', text: 'No NFL games for these starters this week.' })])
-  );
+  renderGameList(model.games, watched, (g) => whoLine(byGame.get(g.id), watched.has(g.id)), 'No NFL games for these starters this week.');
 
   // Lineups
   const cell = (p, mine) => {
@@ -555,11 +587,14 @@ function paintLeague(v) {
     })
   );
   const { games, count } = leagueGames(data);
-  $('games').replaceChildren(
-    ...orderGames(games, watched).map((g) => {
+  renderGameList(
+    games,
+    watched,
+    (g) => {
       const n = count.get(g.id) ?? 0;
-      return gameCard(g, watched, h('div', { class: 'who' }, `${n} starter${n === 1 ? '' : 's'} in this league`));
-    })
+      return h('div', { class: 'who muted', text: `${n} league starter${n === 1 ? '' : 's'}` });
+    },
+    'No NFL games this week.'
   );
   const all = games.length > 0 && games.every((g) => watched.has(g.id));
   $('btn-all').disabled = all;

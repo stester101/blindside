@@ -80,7 +80,12 @@ ok(/J\. Burrow 49\.48/.test(card) && /C\. Brown 12\.1/.test(card) && /J\. Chase 
 const other = await page.locator('.game', { hasText: 'CAR @ GB' }).innerText();
 ok(!/\d+\.\d/.test(other), 'unwatched game card shows no points');
 const order = await page.locator('.game .matchupname').allInnerTexts();
-ok(order[order.length - 1].startsWith('TEN @ CIN'), `watched game moves to the bottom (last: ${order[order.length - 1]})`);
+ok(order.indexOf('TEN @ CIN') === 2, `games stay in kickoff order after ticking (${order.join(', ')})`);
+await page.click('#btn-hide');
+ok((await page.locator('.game', { hasText: 'TEN @ CIN' }).count()) === 0 && (await page.locator('.game').count()) === 8, 'Hide watched hides ticked games');
+await shot('3b-hide-watched');
+await page.click('#btn-hide');
+ok((await page.locator('.game').count()) === 9, 'Show watched brings them back');
 await shot('3-one-game');
 
 // Persisted across reload
@@ -121,7 +126,7 @@ ok(yours.join(',') === '37.70,49.48', `league view reveals TEN@CIN in your match
 await page.evaluate(() => window.scrollTo(0, 0));
 await shot('6-league');
 await page.click('#btn-reset');
-await page.getByRole('button', { name: 'My matchup' }).click();
+await page.getByRole('button', { name: 'Mine', exact: true }).click();
 await waitWeek('8');
 
 // Second league (superflex)
