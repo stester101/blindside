@@ -35,6 +35,9 @@ function defaultSeason() {
 const watchedKey = (lg, week) => `watched:${lg.leagueId}:${lg.season}:${week}`;
 const loadWatched = (lg, week) => new Set(store.get(watchedKey(lg, week), []));
 const saveWatched = (lg, week, set) => store.set(watchedKey(lg, week), [...set]);
+// A week is "done" once every game in your matchup is ticked and final (drives the default week).
+const doneKey = (lg, week) => `done:${lg.leagueId}:${lg.season}:${lg.teamId}:${week}`;
+const isDone = (lg, week) => store.get(doneKey(lg, week), false) === true;
 
 /* ---------- state ---------- */
 const state = {
@@ -44,6 +47,7 @@ const state = {
   meta: {}, // leagueId -> {currentWeek, weeks}
   cache: new Map(), // `${leagueId}:${season}:${teamId}:${week}` -> view data (in memory only)
   view: null, // current rendered league view data
+  mode: 'mine', // 'mine' | 'league'
   seq: 0,
 };
 
@@ -222,12 +226,45 @@ function renderSetup({ prefill, changeTeamFor }) {
 }
 
 /* ---------- league view ---------- */
+/* ---------- data ---------- */
+const weekKey = (lg, week) => `${lg.leagueId}:${lg.season}:${week}`;
+
+/** Scoreboard + my matchup's boxscore for a week (cached in memory). */
+async function getWeek(lg, week, { force = false, sbRaw = null } = {}) {
+  const ck = weekKey(lg, week);
+  let d = force ? null : state.cache.get(ck);
+  if (d && d.teamId === lg.teamId) return d;
+  const raw = sbRaw ?? (await api('FetchLeagueScoreboard', { league_id: lg.leagueId, season: lg.season, scoring_period: week }));
+  const sb = parseScoreboard(raw, lg.teamId);
+  d = { week, teamId: lg.teamId, matchup: sb.matchup, matchups: sb.matchups, model: null, league: null };
+  if (sb.matchup) {
+    const box = await api('FetchLeagueBoxscore', { league_id: lg.leagueId, scoring_period: week, fantasy_game_id: sb.matchup.fantasyGameId });
+    d.model = parseBoxscore(box, lg.teamId);
+  }
+  state.cache.set(ck, d);
+  return d;
+}
+
+/** Every matchup's boxscore for the week, from the away team's perspective. */
+async function getLeagueModels(lg, d) {
+  if (d.league) return d.league;
+  d.league = await Promise.all(
+    d.matchups.map(async (m) => {
+      const box = await api('FetchLeagueBoxscore', { league_id: lg.leagueId, scoring_period: d.week, fantasy_game_id: m.fantasyGameId });
+      return { ...m, model: parseBoxscore(box, m.awayId) };
+    })
+  );
+  return d.league;
+}
+
+const allStartersUpcoming = (model) => model.games.length > 0 && model.games.every((g) => gameStatus(g) === 'upcoming');
+
 async function loadLeague(lg, { force = false } = {}) {
   if (!lg) return go('add');
   const seq = ++state.seq;
   $('actions').hidden = true;
   state.view = null;
-  main().replaceChildren(h('p', { class: 'muted center pad', text: 'Loading matchup…' }));
+  main().replaceChildren(h('p', { class: 'muted center pad', text: 'Loading…' }));
 
   try {
     let meta = state.meta[lg.leagueId];
@@ -236,33 +273,29 @@ async function loadLeague(lg, { force = false } = {}) {
       // Without scoring_period Fleaflicker returns the current week.
       firstSb = await api('FetchLeagueScoreboard', { league_id: lg.leagueId, season: lg.season });
       const p = parseScoreboard(firstSb, lg.teamId);
-      meta = { currentWeek: p.currentWeek ?? p.week, weeks: p.weeks.length ? p.weeks : [p.week] };
+      meta = { currentWeek: p.currentWeek ?? p.week, weeks: p.weeks.length ? p.weeks : [p.week], sbWeek: p.week };
       state.meta[lg.leagueId] = meta;
     }
-    const week = state.weekByLeague[lg.leagueId] ?? meta.currentWeek;
-    state.weekByLeague[lg.leagueId] = week;
-    const ck = `${lg.leagueId}:${lg.season}:${lg.teamId}:${week}`;
-    let data = force ? null : state.cache.get(ck);
-    if (!data) {
-      const sbRaw =
-        firstSb && parseScoreboard(firstSb, lg.teamId).week === week
-          ? firstSb
-          : await api('FetchLeagueScoreboard', { league_id: lg.leagueId, season: lg.season, scoring_period: week });
-      const sb = parseScoreboard(sbRaw, lg.teamId);
-      if (!sb.matchup) {
-        data = { week, matchup: null };
-      } else {
-        const box = await api('FetchLeagueBoxscore', {
-          league_id: lg.leagueId,
-          scoring_period: week,
-          fantasy_game_id: sb.matchup.fantasyGameId,
-        });
-        data = { week, matchup: sb.matchup, model: parseBoxscore(box, lg.teamId) };
+    let week = state.weekByLeague[lg.leagueId];
+    const sbFor = (w) => (firstSb && meta.sbWeek === w ? firstSb : null);
+    let d;
+    if (week == null) {
+      // Default week: the current one, unless none of its games have kicked off yet and
+      // last week isn't finished (e.g. catching up on Monday night on a Tuesday).
+      week = meta.currentWeek;
+      d = await getWeek(lg, week, { force, sbRaw: sbFor(week) });
+      const prev = meta.weeks[meta.weeks.indexOf(week) - 1];
+      if (prev != null && d.model && allStartersUpcoming(d.model) && !isDone(lg, prev)) {
+        week = prev;
+        d = await getWeek(lg, week, { force });
       }
-      state.cache.set(ck, data);
+      state.weekByLeague[lg.leagueId] = week;
+    } else {
+      d = await getWeek(lg, week, { force, sbRaw: sbFor(week) });
     }
+    if (state.mode === 'league') await getLeagueModels(lg, d);
     if (seq !== state.seq) return; // user navigated away meanwhile
-    renderLeague(lg, meta, data);
+    renderLeague(lg, meta, d);
   } catch (e) {
     if (seq !== state.seq) return;
     main().replaceChildren(
@@ -321,101 +354,142 @@ function weekBar(lg, meta, week) {
   );
 }
 
-function renderLeague(lg, meta, data) {
-  const { week } = data;
-  if (!data.matchup) {
-    $('actions').hidden = true;
-    main().replaceChildren(
-      weekBar(lg, meta, week),
-      h('section', { class: 'card' }, h('p', { class: 'muted', text: `${lg.teamName} has no matchup in week ${week}.` })),
-      h('section', { class: 'card' }, h('div', { class: 'manage' }, manageButtons(lg)))
-    );
-    return;
-  }
+function modeSwitch(lg) {
+  const btn = (mode, label) =>
+    h('button', {
+      type: 'button',
+      class: 'seg',
+      'aria-pressed': String(state.mode === mode),
+      text: label,
+      onclick: () => {
+        if (state.mode === mode) return;
+        state.mode = mode;
+        loadLeague(lg);
+      },
+    });
+  return h('div', { class: 'segbar', role: 'group', 'aria-label': 'View' }, btn('mine', 'My matchup'), btn('league', 'League'));
+}
+
+function renderLeague(lg, meta, d) {
+  const { week } = d;
+  const head = [weekBar(lg, meta, week), modeSwitch(lg)];
+  const manage = h('section', { class: 'card' }, h('h2', { text: lg.leagueName }), h('div', { class: 'manage' }, manageButtons(lg)));
   const watched = loadWatched(lg, week);
-  state.view = { lg, meta, data, watched };
-  main().replaceChildren(
-    weekBar(lg, meta, week),
-    h('section', { class: 'card matchup', id: 'matchup' }),
-    h('section', { class: 'card' }, h('h2', { text: 'NFL games' }), h('div', { class: 'games', id: 'games' })),
-    h('section', { class: 'card' }, h('h2', { text: 'Starting lineups' }), h('div', { class: 'lineup', id: 'lineup' })),
-    h('section', { class: 'card' }, h('h2', { text: lg.leagueName }), h('div', { class: 'manage' }, manageButtons(lg)))
-  );
+
+  if (state.mode === 'league') {
+    state.view = { lg, meta, data: d, watched, mode: 'league' };
+    main().replaceChildren(
+      ...head,
+      h('section', { class: 'card' }, h('h2', { text: 'Matchups' }), h('div', { class: 'mlist', id: 'mlist' })),
+      h('section', { class: 'card' }, h('h2', { text: 'NFL games' }), h('div', { class: 'games', id: 'games' })),
+      manage
+    );
+  } else if (!d.matchup) {
+    state.view = null;
+    $('actions').hidden = true;
+    main().replaceChildren(...head, h('section', { class: 'card' }, h('p', { class: 'muted', text: `${lg.teamName} has no matchup in week ${week}.` })), manage);
+    return;
+  } else {
+    state.view = { lg, meta, data: d, watched, mode: 'mine' };
+    main().replaceChildren(
+      ...head,
+      h('section', { class: 'card matchup', id: 'matchup' }),
+      h('section', { class: 'card' }, h('h2', { text: 'NFL games' }), h('div', { class: 'games', id: 'games' })),
+      h('section', { class: 'card' }, h('h2', { text: 'Starting lineups' }), h('div', { class: 'lineup', id: 'lineup' })),
+      manage
+    );
+  }
   $('actions').hidden = false;
   paint();
+}
+
+/* ---------- shared view pieces ---------- */
+
+/** Starters whose NFL game hasn't been ticked (byes and empty slots excluded). */
+const playersLeft = (model, side, watched) =>
+  model.slots.reduce((n, s) => n + (s[side]?.gameId != null && !watched.has(s[side].gameId) ? 1 : 0), 0);
+
+/**
+ * Scoreboard rows: one row per team, name + players left on the left, score on the right.
+ * A score only appears once at least one of that matchup's games has been watched.
+ */
+function scoreRows(model, names, watched, { big = true } = {}) {
+  const r = computeReveal(model, watched);
+  const row = (side, name, pts) => {
+    const left = playersLeft(model, side, watched);
+    return h(
+      'div',
+      { class: `srow ${side}` },
+      h('div', { class: 'sname' }, h('div', { class: 'tname', text: name }), h('div', { class: 'left', text: left ? `${left} player${left === 1 ? '' : 's'} left` : 'All watched' })),
+      r.anyWatched ? h('div', { class: big ? 'pts' : 'pts sm', text: fmtTotal(pts) }) : null
+    );
+  };
+  return { r, rows: [row('me', names[0], r.me), row('opp', names[1], r.opp)] };
+}
+
+/** Status line: locked progress, or the result once every game is ticked. */
+function statusLine(r, { mine }) {
+  if (!r.allWatched) return h('div', { class: 'status', text: `🔒 ${r.watchedCount}/${r.total} games watched` });
+  const diff = Math.round((r.me - r.opp) * 100) / 100;
+  if (!mine) {
+    const t = diff === 0 ? 'Tied' : r.allFinal ? 'Final' : 'In progress';
+    return h('div', { class: 'status done', text: t });
+  }
+  const tail = r.allFinal ? '' : ' (still in progress)';
+  if (diff > 0) return h('div', { class: 'result win', text: r.allFinal ? 'You win' : `You lead${tail}` });
+  if (diff < 0) return h('div', { class: 'result loss', text: r.allFinal ? 'You lose' : `You trail${tail}` });
+  return h('div', { class: 'result', text: r.allFinal ? 'Tie' : `Tied${tail}` });
+}
+
+/** Order: games you can watch now, then not-yet-started, then already watched. */
+function orderGames(games, watched) {
+  const rank = (g) => (watched.has(g.id) ? 2 : gameStatus(g) === 'upcoming' ? 1 : 0);
+  return [...games].sort((a, b) => rank(a) - rank(b) || a.kickoff - b.kickoff || a.id - b.id);
+}
+
+function gameCard(g, watched, detail) {
+  const st = gameStatus(g);
+  const on = watched.has(g.id);
+  return h(
+    'button',
+    { class: 'game', type: 'button', 'aria-pressed': String(on), disabled: st === 'upcoming' && !on, onclick: () => toggleGame(g.id) },
+    h(
+      'div',
+      {},
+      h('div', { class: 'matchupname' }, `${g.away} @ ${g.home}`, st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : null),
+      h('div', { class: 'meta', text: st === 'upcoming' ? `Kicks off ${fmtKick(g.kickoff)}` : st === 'live' ? 'In progress' : `${fmtKick(g.kickoff)} · Final` }),
+      detail
+    ),
+    h('span', { class: 'toggle', 'aria-hidden': 'true' })
+  );
 }
 
 /** Re-render all spoiler-sensitive parts from the in-memory model + watched set. */
 function paint() {
   const v = state.view;
   if (!v) return;
-  const { data, watched } = v;
+  if (v.mode === 'league') return paintLeague(v);
+  const { lg, data, watched } = v;
   const { model, matchup } = data;
-  const r = computeReveal(model, watched);
 
-  // Players left: starters whose NFL game isn't ticked yet (byes/empty slots excluded).
-  // Uses only lineups, kickoff times and the watched set, never points.
-  const gameById = new Map(model.games.map((g) => [g.id, g]));
-  const leftFor = (side) => {
-    let left = 0;
-    let yet = 0;
-    for (const s of model.slots) {
-      const p = s[side];
-      if (p?.gameId == null || watched.has(p.gameId)) continue;
-      left++;
-      if (gameStatus(gameById.get(p.gameId)) === 'upcoming') yet++;
-    }
-    return h(
-      'div',
-      { class: 'left' },
-      h('div', { text: left ? `${left} left to watch` : 'All watched' }),
-      yet ? h('div', { class: 'yet', text: `${yet} yet to play` }) : null
-    );
-  };
-
-  // Matchup bar
-  const show = r.anyWatched;
+  // Matchup card
+  const { r, rows } = scoreRows(model, [matchup.myName, matchup.oppName], watched);
   const sum = r.me + r.opp;
-  const mPct = show && sum > 0 ? Math.max(0, (r.me / sum) * 100) : 0;
-  const oPct = show && sum > 0 ? Math.max(0, (r.opp / sum) * 100) : 0;
-  let result;
-  if (!r.allWatched) {
-    const left = r.total - r.watchedCount;
-    result = h('div', { class: 'result locked', text: `🔒 Result locked · ${left} game${left === 1 ? '' : 's'} left to watch` });
-  } else {
-    const diff = Math.round((r.me - r.opp) * 100) / 100;
-    const live = !r.allFinal ? ' (games still in progress)' : '';
-    if (diff > 0) result = h('div', { class: 'result win', text: r.allFinal ? 'You win!' : `You lead${live}` });
-    else if (diff < 0) result = h('div', { class: 'result loss', text: r.allFinal ? 'You lose' : `You trail${live}` });
-    else result = h('div', { class: 'result', text: r.allFinal ? 'Tie' : `Tied${live}` });
-  }
-  $('matchup').replaceChildren(
-    h(
-      'div',
-      { class: 'scoreline' },
-      h('div', { class: 'side me' }, h('div', { class: 'tname', text: matchup.myName }), show ? h('div', { class: 'pts', text: fmtTotal(r.me) }) : h('div', { class: 'pts off', text: 'Hidden' }), leftFor('me')),
-      h('div', { class: 'vs', text: 'vs' }),
-      h('div', { class: 'side opp right' }, h('div', { class: 'tname', text: matchup.oppName }), show ? h('div', { class: 'pts', text: fmtTotal(r.opp) }) : h('div', { class: 'pts off', text: 'Hidden' }), leftFor('opp'))
-    ),
-    h('div', { class: 'bar', 'aria-hidden': 'true' }, h('i', { class: 'm', style: `width:${mPct}%` }), h('i', { class: 'o', style: `width:${oPct}%` })),
-    h('div', { class: 'small muted center', text: `${r.watchedCount} of ${r.total} games watched` }),
-    h('div', { style: 'height:8px' }),
-    result
-  );
+  const bar =
+    r.anyWatched && sum > 0
+      ? h('div', { class: 'bar', 'aria-hidden': 'true' }, h('i', { class: 'm', style: `width:${Math.max(0, (r.me / sum) * 100)}%` }), h('i', { class: 'o', style: `width:${Math.max(0, (r.opp / sum) * 100)}%` }))
+      : null;
+  $('matchup').replaceChildren(...[...rows, bar, statusLine(r, { mine: true })].filter(Boolean));
+  store.set(doneKey(lg, data.week), r.allWatched && r.allFinal);
 
-  // Games
+  // Games: names always, each player's points once the game is ticked.
   const byGame = new Map(model.games.map((g) => [g.id, { me: [], opp: [] }]));
   for (const s of model.slots) {
     if (s.me?.gameId != null) byGame.get(s.me.gameId)?.me.push(s.me);
     if (s.opp?.gameId != null) byGame.get(s.opp.gameId)?.opp.push(s.opp);
   }
-  // Names always; points only once this game is watched.
   const playerList = (players, revealed) =>
-    players.flatMap((p, i) => [
-      i ? ', ' : '',
-      p.name,
-      revealed ? h('b', { class: 'gp', text: ` ${fmtPts(p.points)}` }) : null,
-    ]);
+    players.flatMap((p, i) => [i ? ', ' : '', p.name, revealed ? h('b', { class: 'gp', text: ` ${fmtPts(p.points)}` }) : null]);
   const whoLine = (who, revealed) =>
     h(
       'div',
@@ -426,32 +500,7 @@ function paint() {
     );
   $('games').replaceChildren(
     ...(model.games.length
-      ? model.games.map((g) => {
-          const st = gameStatus(g);
-          const on = watched.has(g.id);
-          const who = byGame.get(g.id);
-          return h(
-            'button',
-            {
-              class: 'game',
-              type: 'button',
-              'aria-pressed': String(on),
-              disabled: st === 'upcoming' && !on,
-              onclick: () => toggleGame(g.id),
-            },
-            h(
-              'div',
-              {},
-              h('div', { class: 'matchupname' }, `${g.away} @ ${g.home}`, st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : null),
-              h('div', {
-                class: 'meta',
-                text: st === 'upcoming' ? `Kicks off ${fmtKick(g.kickoff)}` : st === 'live' ? 'In progress · points so far' : `${fmtKick(g.kickoff)} · Final`,
-              }),
-              whoLine(who, on)
-            ),
-            h('span', { class: 'toggle', 'aria-hidden': 'true' })
-          );
-        })
+      ? orderGames(model.games, watched).map((g) => gameCard(g, watched, whoLine(byGame.get(g.id), watched.has(g.id))))
       : [h('p', { class: 'muted', text: 'No NFL games for these starters this week.' })])
   );
 
@@ -460,7 +509,6 @@ function paint() {
     const cls = mine ? 'pl mine' : 'pl theirs right';
     if (!p) return h('div', { class: `${cls} empty` }, h('div', { class: 'n', text: 'Empty' }));
     const rev = p.gameId != null && watched.has(p.gameId);
-    // Only a revealed score or BYE gets a points line; otherwise nothing is shown.
     const pts = p.bye ? 'BYE' : rev ? fmtPts(p.points) : null;
     return h(
       'div',
@@ -481,6 +529,43 @@ function paint() {
   $('btn-reset').disabled = !r.anyWatched;
 }
 
+/** Union of NFL games across every matchup in the league. */
+function leagueGames(d) {
+  const games = new Map();
+  const count = new Map();
+  for (const m of d.league) {
+    for (const g of m.model.games) games.set(g.id, g);
+    for (const s of m.model.slots) for (const p of [s.me, s.opp]) if (p?.gameId != null) count.set(p.gameId, (count.get(p.gameId) ?? 0) + 1);
+  }
+  return { games: [...games.values()], count };
+}
+
+function paintLeague(v) {
+  const { data, watched, lg } = v;
+  const mineFirst = [...data.league].sort((a, b) => (b.fantasyGameId === data.matchup?.fantasyGameId) - (a.fantasyGameId === data.matchup?.fantasyGameId));
+  $('mlist').replaceChildren(
+    ...mineFirst.map((m) => {
+      const { r, rows } = scoreRows(m.model, [m.awayName, m.homeName], watched, { big: false });
+      const mine = m.awayId === lg.teamId || m.homeId === lg.teamId;
+      // Highlight the leader only once that matchup is fully watched.
+      const lead = r.allWatched && r.me !== r.opp ? (r.me > r.opp ? 'me' : 'opp') : null;
+      const card = h('div', { class: `mcard${mine ? ' yours' : ''}` }, ...rows, statusLine(r, { mine: false }));
+      if (lead) card.querySelector(`.srow.${lead}`)?.classList.add('lead');
+      return card;
+    })
+  );
+  const { games, count } = leagueGames(data);
+  $('games').replaceChildren(
+    ...orderGames(games, watched).map((g) => {
+      const n = count.get(g.id) ?? 0;
+      return gameCard(g, watched, h('div', { class: 'who' }, `${n} starter${n === 1 ? '' : 's'} in this league`));
+    })
+  );
+  const all = games.length > 0 && games.every((g) => watched.has(g.id));
+  $('btn-all').disabled = all;
+  $('btn-reset').disabled = watched.size === 0;
+}
+
 function toggleGame(id) {
   const v = state.view;
   if (!v) return;
@@ -494,9 +579,10 @@ function toggleGame(id) {
 $('btn-all').addEventListener('click', () => {
   const v = state.view;
   if (!v) return;
-  const startable = v.data.model.games.filter((g) => gameStatus(g) !== 'upcoming');
+  const games = v.mode === 'league' ? leagueGames(v.data).games : v.data.model.games;
+  const startable = games.filter((g) => gameStatus(g) !== 'upcoming' && !v.watched.has(g.id));
   if (!startable.length) return;
-  if (!confirm(`Reveal all ${startable.length} games for week ${v.data.week}? This can show the result.`)) return;
+  if (!confirm(`Reveal ${startable.length} more game${startable.length === 1 ? '' : 's'} for week ${v.data.week}? This can show results.`)) return;
   for (const g of startable) v.watched.add(g.id);
   saveWatched(v.lg, v.data.week, v.watched);
   paint();

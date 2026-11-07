@@ -75,21 +75,11 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--muted); t
 }
 
 /* Matchup bar */
-.matchup { position: sticky; top: 61px; z-index: 4; }
-.scoreline { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; }
-.side { min-width: 0; }
-.side.right { text-align: right; }
 .tname { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pts { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.side.me .pts { color: var(--me); }
-.side.opp .pts { color: var(--opp); }
-.vs { color: var(--muted); padding-bottom: 10px; }
-.bar { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--card2); margin: 10px 0 8px; }
+.bar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--card2); margin: 10px 0 0; }
 .bar i { display: block; height: 100%; transition: width .25s; }
 .bar .m { background: var(--me); }
 .bar .o { background: var(--opp); margin-left: auto; }
-.result { text-align: center; font-weight: 700; padding: 6px; border-radius: 10px; background: var(--card2); }
-.result.locked { color: var(--muted); font-weight: 600; }
 .result.win { color: #04111f; background: var(--me); }
 .result.loss { color: #1f0a04; background: var(--opp); }
 
@@ -140,7 +130,6 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--muted); t
 .actions .btn.primary { flex: 1; max-width: 340px; }
 
 @media (max-width: 360px) {
-  .pts { font-size: 28px; }
   .lineup { grid-template-columns: 1fr 34px 1fr; }
   .pl { padding: 6px 8px; }
 }
@@ -148,11 +137,32 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--muted); t
 /* Revealed per-player points on a watched game card */
 .who .gp { color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* Players left under each total */
-.left { font-size: 13px; color: var(--muted); line-height: 1.3; }
-.left .yet { font-size: 12px; opacity: .8; }
-.scoreline { align-items: start; }
-.vs { padding-top: 30px; padding-bottom: 0; }
+/* Matchup card: one row per team — name + players left, score on the right */
+.matchup { position: sticky; top: 61px; z-index: 4; padding: 12px 14px; }
+.srow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.sname { min-width: 0; }
+.srow .tname { font-size: 17px; font-weight: 700; color: var(--text); }
+.srow.me .tname { color: var(--me); }
+.srow.opp .tname { color: var(--opp); }
+.left { font-size: 13px; color: var(--muted); }
+.pts { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; flex: none; }
+.srow.me .pts { color: var(--me); }
+.srow.opp .pts { color: var(--opp); }
+.pts.sm { font-size: 22px; }
+.status { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.result { margin-top: 10px; text-align: center; font-weight: 700; padding: 8px; border-radius: 10px; background: var(--card2); }
 
-/* Total not revealed yet: plain word instead of a number */
-.side .pts.off { color: var(--muted); font-size: 20px; font-weight: 600; line-height: 41px; }
+/* View switch */
+.segbar { display: flex; gap: 4px; padding: 4px; margin-bottom: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.seg { flex: 1; min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; }
+.seg[aria-pressed="true"] { background: var(--card2); color: var(--text); }
+
+/* League view */
+.mlist { display: grid; gap: 8px; }
+.mcard { background: var(--card2); border-radius: 12px; padding: 8px 12px 10px; border: 1px solid transparent; }
+.mcard.yours { border-color: var(--accent); }
+.mcard .srow .tname { font-size: 15px; color: var(--text); }
+.mcard .srow .pts { color: var(--text); }
+.mcard .srow.lead .tname, .mcard .srow.lead .pts { color: var(--me); }
+.mcard .status { margin-top: 4px; }
+.mcard .status.done { color: var(--text); }

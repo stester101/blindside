@@ -31,6 +31,14 @@ export function parseScoreboard(raw, teamId) {
   const nowP = periods.find((p) => p.containsNow || p.low?.isNow);
   const week = raw?.schedulePeriod?.ordinal ?? null;
   const currentWeek = nowP?.ordinal ?? (raw?.schedulePeriod?.containsNow ? week : null);
+  // All fantasy matchups this week (names/ids only; their scores are never read).
+  const matchups = (raw?.games ?? []).map((g) => ({
+    fantasyGameId: String(g.id),
+    awayId: g.away?.id ?? null,
+    awayName: g.away?.name ?? 'Team',
+    homeId: g.home?.id ?? null,
+    homeName: g.home?.name ?? 'Team',
+  }));
   let matchup = null;
   for (const g of raw?.games ?? []) {
     const side = g.away?.id === teamId ? 'away' : g.home?.id === teamId ? 'home' : null;
@@ -44,7 +52,7 @@ export function parseScoreboard(raw, teamId) {
     };
     break;
   }
-  return { week, currentWeek, weeks, matchup };
+  return { week, currentWeek, weeks, matchup, matchups };
 }
 
 function parsePlayer(p, games) {

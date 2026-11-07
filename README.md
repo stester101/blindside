@@ -62,9 +62,10 @@ Open the URL in Chrome → **⋮** menu → **Add to home screen** → **Install
 
 1. On first launch the league ID **219707** is pre-filled and its teams load. Tap your team.
 2. Tap **+** to add more leagues (e.g. `332885`). Each league becomes a tab showing your team name.
-3. The week picker defaults to the current NFL week. Use ‹ › or the dropdown to change it.
-4. Tick the games you've watched. Games that haven't kicked off can't be ticked. Games in progress show **LIVE**, and ticking one reveals the points so far.
-5. **Mark all watched** asks for confirmation first, because it can reveal the result. **Reset** hides everything again for that week. **↻** re-fetches from Fleaflicker.
+3. The week picker opens on the current NFL week. The exception: if none of this week's starters have kicked off yet and you haven't finished last week, it opens on last week (handy for Monday night catch-up). Use ‹ › or the dropdown to change it.
+4. Tick the games you've watched. Games you can watch now are at the top, then games that haven't kicked off, then the ones you've already ticked. Each ticked game shows its players' points. Games that haven't kicked off can't be ticked. Games in progress show **LIVE**, and ticking one reveals the points so far.
+5. **League** (next to **My matchup**) shows every matchup in the league with the same tick-to-reveal, using the same ticked games.
+6. **Mark all watched** asks for confirmation first, because it can reveal the result. **Reset** hides everything again for that week. **↻** re-fetches from Fleaflicker.
 
 **Sharing with league mates:** send them `https://<your-url>/?league=<their league id>`. That pre-fills the league ID so they just tap their own team. Nothing in the app is tied to one person.
 
