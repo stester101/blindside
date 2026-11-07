@@ -145,5 +145,5 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--muted); t
   .pl { padding: 6px 8px; }
 }
 
-/* Games with only bench players: shown for context, not tickable */
-.game.bench { grid-template-columns: 1fr; opacity: .55; border-style: dashed; background: transparent; }
+/* Revealed per-player points on a watched game card */
+.who .gp { color: var(--text); font-variant-numeric: tabular-nums; }

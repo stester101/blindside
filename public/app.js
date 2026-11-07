@@ -387,38 +387,28 @@ function paint() {
   // Games
   const byGame = new Map(model.games.map((g) => [g.id, { me: [], opp: [] }]));
   for (const s of model.slots) {
-    if (s.me?.gameId != null) byGame.get(s.me.gameId)?.me.push(s.me.name);
-    if (s.opp?.gameId != null) byGame.get(s.opp.gameId)?.opp.push(s.opp.name);
+    if (s.me?.gameId != null) byGame.get(s.me.gameId)?.me.push(s.me);
+    if (s.opp?.gameId != null) byGame.get(s.opp.gameId)?.opp.push(s.opp);
   }
-  const whoLine = (who, bench) =>
+  // Names always; points only once this game is watched.
+  const playerList = (players, revealed) =>
+    players.flatMap((p, i) => [
+      i ? ', ' : '',
+      p.name,
+      revealed ? h('b', { class: 'gp', text: ` ${fmtPts(p.points)}` }) : null,
+    ]);
+  const whoLine = (who, revealed) =>
     h(
       'div',
       { class: 'who' },
-      who.me.length ? h('span', { class: 'm', text: `You${bench ? ' (bench)' : ''}: ${who.me.join(', ')}` }) : null,
+      who.me.length ? h('span', { class: 'm' }, 'You: ', ...playerList(who.me, revealed)) : null,
       who.me.length && who.opp.length ? ' · ' : null,
-      who.opp.length ? h('span', { class: 'o', text: `Opp${bench ? ' (bench)' : ''}: ${who.opp.join(', ')}` }) : null
+      who.opp.length ? h('span', { class: 'o' }, 'Opp: ', ...playerList(who.opp, revealed)) : null
     );
-  const benchOnly = model.benchOnly ?? [];
-  const rows = [...model.games.map((g) => ({ g, bench: false })), ...benchOnly.map((g) => ({ g, bench: true }))].sort(
-    (a, b) => a.g.kickoff - b.g.kickoff || a.g.id - b.g.id
-  );
   $('games').replaceChildren(
-    ...(rows.length
-      ? rows.map(({ g, bench }) => {
+    ...(model.games.length
+      ? model.games.map((g) => {
           const st = gameStatus(g);
-          if (bench) {
-            return h(
-              'div',
-              { class: 'game bench' },
-              h(
-                'div',
-                {},
-                h('div', { class: 'matchupname', text: `${g.away} @ ${g.home}` }),
-                h('div', { class: 'meta', text: `${st === 'upcoming' ? 'Kicks off ' + fmtKick(g.kickoff) : fmtKick(g.kickoff)} · Bench only, doesn't affect the score` }),
-                whoLine(g, true)
-              )
-            );
-          }
           const on = watched.has(g.id);
           const who = byGame.get(g.id);
           return h(
@@ -438,7 +428,7 @@ function paint() {
                 class: 'meta',
                 text: st === 'upcoming' ? `Kicks off ${fmtKick(g.kickoff)}` : st === 'live' ? 'In progress · points so far' : `${fmtKick(g.kickoff)} · Final`,
               }),
-              whoLine(who, false)
+              whoLine(who, on)
             ),
             h('span', { class: 'toggle', 'aria-hidden': 'true' })
           );

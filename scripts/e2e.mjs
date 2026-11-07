@@ -45,8 +45,7 @@ ok((await page.title()) === 'Blindside', 'title has no scores');
 const weekNow = await page.locator('.weekbar select').inputValue();
 ok(weekNow === '9', `defaults to current NFL week (got ${weekNow})`);
 await page.waitForSelector('.game');
-const thu = page.locator('.game.bench', { hasText: 'JAC @ BAL' });
-ok((await thu.count()) === 1 && (await thu.locator('button').count()) === 0, 'week 9 Thursday JAC@BAL shown as bench-only, not tickable');
+ok((await page.locator('.game', { hasText: 'JAC @ BAL' }).count()) === 0, 'bench-only games (week 9 Thu JAC@BAL) not listed');
 await shot('2-week-now-hidden');
 
 // Week 8 is complete: use it to verify reveal math against Fleaflicker's official totals.
@@ -59,7 +58,7 @@ ok(hiddenTexts.every((t) => t === '••' || t === 'BYE' || t === '—'), 'all 
 ok((await page.locator('.result').innerText()).includes('locked'), 'result locked');
 const seenBefore = await page.evaluate(() => window.__seen.join('\n'));
 ok(!/\b\d{1,3}\.\d{1,2}\b/.test(seenBefore), 'no decimal numbers ever entered the DOM before ticking (no flash)');
-const nGames = await page.locator('.game:not(.bench)').count();
+const nGames = await page.locator('.game').count();
 ok(nGames === 9, `week 8 shows 9 relevant NFL games (got ${nGames})`);
 
 // Tick TEN @ CIN: my Burrow 49.48 (QB) and opp C. Brown 12.1 + J. Chase 25.6 played there.
@@ -69,6 +68,10 @@ ok(m1 === '49.48' && o1 === '37.70', `ticking TEN@CIN reveals only that game (me
 const revealed = await page.locator('.pl .p.rev').allInnerTexts();
 ok(revealed.length === 3, `exactly 3 players revealed (got ${revealed.length}: ${revealed.join(',')})`);
 ok((await page.locator('.result').innerText()).includes('8 games left'), 'result still locked with 8 games left');
+const card = await page.locator('.game', { hasText: 'TEN @ CIN' }).innerText();
+ok(/J\. Burrow 49\.48/.test(card) && /C\. Brown 12\.1/.test(card) && /J\. Chase 25\.6/.test(card), 'watched game card shows each player\'s points');
+const other = await page.locator('.game', { hasText: 'CAR @ GB' }).innerText();
+ok(!/\d+\.\d/.test(other), 'unwatched game card shows no points');
 await shot('3-one-game');
 
 // Persisted across reload

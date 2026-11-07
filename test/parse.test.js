@@ -45,11 +45,7 @@ test('boxscore → starters linked to NFL games, bench ignored', () => {
   assert.equal(m.slots[1].opp.bye, true);
   assert.equal(m.slots[2].opp, null);
   assert.equal(m.slots[2].me.points, 0);
-  // bench-only game is listed separately, with names but no points
-  assert.equal(m.benchOnly.length, 1);
-  assert.equal(m.benchOnly[0].id, 7976);
-  assert.deepEqual(m.benchOnly[0].me, ['Bench']);
-  assert.ok(!JSON.stringify(m.benchOnly).includes('99'), 'bench points not kept');
+  assert.ok(!m.games.some((g) => g.id === 7976), 'bench-only game excluded');
   // perspective flips when I am the home team
   assert.equal(parseBoxscore(box, 20).slots[0].me.name, 'H. Home');
 });
