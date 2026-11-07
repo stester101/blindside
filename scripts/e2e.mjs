@@ -66,7 +66,7 @@ const seenBefore = await page.evaluate(() => window.__seen.join('\n'));
 ok(!/\b\d{1,3}\.\d{1,2}\b/.test(seenBefore), 'no decimal numbers ever entered the DOM before ticking (no flash)');
 const nGames = await page.locator('.game').count();
 ok(nGames === 9, `week 8 shows 9 relevant NFL games (got ${nGames})`);
-ok((await page.locator('.game .tbadge').count()) === 18, 'each game shows two team badges');
+ok((await page.locator('.game .tbadge, .game img, .game svg:not(.ico svg)').count()) === 0 || (await page.locator('.tbadge').count()) === 0, 'no team logos or badges on game cards');
 const leftTxt = await page.locator('#matchup .left').allInnerTexts();
 ok(leftTxt[0] === '9 players left' && leftTxt[1] === '9 players left', `players left shown once per team (${leftTxt.join(' | ')})`);
 await shot('2-hidden');
@@ -173,6 +173,47 @@ ok((await page.locator('.slot', { hasText: 'SFLX' }).count()) === 1, 'superflex 
 await page.locator('.segbar .seg[data-tab=games]').click();
 await waitWeek('8');
 await shot('5-superflex');
+
+// All leagues: my players across every saved league in one view, with one shared watched set.
+await page.click('#btn-league');
+await page.click('.allrow');
+await page.waitForSelector('#amlist .amrow', { timeout: 30000 });
+await page.selectOption('.weekbar select', '8');
+await page.waitForFunction(() => document.querySelector('.weekbar select')?.value === '8' && document.querySelectorAll('#amlist .amrow').length === 2 && document.querySelector('#games .game'), null, { timeout: 30000 });
+ok((await page.locator('#amlist .amscore').count()) === 0, 'all-leagues view shows no scores before ticking');
+ok((await page.locator('.bottomnav').isHidden()) && (await page.locator('.segbar').count()) === 0, 'all-leagues view has no tab bars');
+const tenCin = page.locator('.game', { hasText: 'TEN @ CIN' });
+ok((await tenCin.locator('.lgline').count()) === 2, 'TEN @ CIN lists my players from both leagues');
+ok(/\d+ of yours/.test(await tenCin.innerText()) && !/\d+\.\d/.test(await tenCin.innerText()), 'card says how many are yours and shows no points yet');
+await tenCin.click();
+const cinText = await tenCin.innerText();
+ok(/Burrow 49\.48/.test(cinText) && /Brown 12\.1/.test(cinText) && !/Opp/.test(cinText), 'one tick reveals my players in both leagues (no opponents)');
+const amText = await page.locator('#amlist').innerText();
+ok(/49\.48/.test(amText) && /37\.70/.test(amText) && /12\.10/.test(amText) && /37\.50/.test(amText), "each league's matchup score builds up");
+ok((await page.locator('#amlist .wl').count()) === 0, 'no W/L while games remain');
+await page.click('#btn-all');
+const verdicts = (await page.locator('#amlist .wl').allInnerTexts()).join(',');
+ok(verdicts === 'W,L', `W/L appear once everything is watched (${verdicts})`);
+await shot('7-all-leagues');
+await page.setViewportSize({ width: 320, height: 700 });
+ok(!(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)), 'all-leagues view fits at 320px');
+await page.setViewportSize({ width: 412, height: 915 });
+
+// The watched set is shared: opening a league from here shows the same ticks.
+await page.locator('#amlist .amrow').first().click();
+await waitWeek('8');
+ok((await page.locator('.game[aria-pressed="true"]').count()) === 9 && (await pts()).join(',') === '128.98,105.72', 'ticks made in the all view carry into the single-league view');
+await page.click('#btn-reset');
+
+// Old per-league saves are migrated into the shared set on load.
+await page.evaluate(() => localStorage.setItem('blindside:v1:watched:219707:2026:8', JSON.stringify([7965])));
+await page.reload();
+await page.waitForSelector('#matchup .mside');
+await page.selectOption('.weekbar select', '8');
+await waitWeek('8');
+ok((await page.locator('.game[aria-pressed="true"]').count()) === 1, 'legacy per-league watched data is migrated');
+ok((await page.evaluate(() => localStorage.getItem('blindside:v1:watched:219707:2026:8'))) === null, 'legacy key removed after migration');
+await page.click('#btn-reset');
 
 // Narrow (cover-screen-ish) width: no horizontal overflow
 await page.setViewportSize({ width: 320, height: 700 });

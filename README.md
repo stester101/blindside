@@ -75,7 +75,9 @@ Open the URL in Chrome → **⋮** menu → **Add to home screen** → **Install
 4. Tick the games you've watched. The eye icon next to "NFL games" hides or shows games you've already ticked. Games are listed in kickoff order. Each ticked game shows its players' points. Games that haven't kicked off can't be ticked. Games in progress show **LIVE**, and ticking one reveals the points so far.
 5. The **Games / Lineups / League** tabs switch views. **Lineups** shows both starting lineups side by side. **League** shows every matchup in the league with the same tick-to-reveal, using the same ticked games.
 6. On the games list, the ✓ icon marks everything watched (it asks first, because it can reveal the result), ↺ hides everything again for that week, and the eye hides or shows games you've already ticked. The refresh icon at the top re-fetches from Fleaflicker, and the gear has change team, remove league and more.
-7. Team badges are the team abbreviation on the team's colour. There are no NFL logos, which are trademarked.
+7. **All leagues** (top of the team picker, once you have two or more leagues) shows your matchups and the NFL games for every saved league on one screen. Each game lists just *your* players per league, and a single tick reveals those players' points in all your leagues. W/L appears for a league only once every game in it is watched.
+8. A watched game counts in every league, because watching a real NFL game doesn't depend on which fantasy league you're looking at. Older per-league saves are merged into the shared set automatically.
+9. There are no NFL logos or team badges (they're trademarked).
 
 **Sharing with league mates:** send them `https://<your-url>/?league=<their league id>`. That pre-fills the league ID so they just tap their own team. Nothing in the app is tied to one person.
 

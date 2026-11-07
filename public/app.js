@@ -32,9 +32,27 @@ function defaultSeason() {
   return d.getMonth() < 2 ? d.getFullYear() - 1 : d.getFullYear();
 }
 
-const watchedKey = (lg, week) => `watched:${lg.leagueId}:${lg.season}:${week}`;
-const loadWatched = (lg, week) => new Set(store.get(watchedKey(lg, week), []));
-const saveWatched = (lg, week, set) => store.set(watchedKey(lg, week), [...set]);
+// Watching an NFL game is a real-world fact, so the watched set is shared by every league (per season + week).
+const watchedKey = (season, week) => `watched:${season}:${week}`;
+const loadWatched = (season, week) => new Set(store.get(watchedKey(season, week), []));
+const saveWatched = (season, week, set) => store.set(watchedKey(season, week), [...set]);
+
+/** One-time: fold the old per-league sets (watched:<league>:<season>:<week>) into the shared ones. */
+function migrateWatched() {
+  try {
+    const re = new RegExp('^' + KEY + 'watched:\\d+:(\\d+):(\\d+)$');
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      const m = k && re.exec(k);
+      if (!m) continue;
+      const merged = new Set([...store.get(`watched:${m[1]}:${m[2]}`, []), ...JSON.parse(localStorage.getItem(k) || '[]')]);
+      store.set(`watched:${m[1]}:${m[2]}`, [...merged]);
+      localStorage.removeItem(k);
+    }
+  } catch {
+    /* storage unavailable: nothing to migrate */
+  }
+}
 // A week is "done" once every game in your matchup is ticked and final (drives the default week).
 const doneKey = (lg, week) => `done:${lg.leagueId}:${lg.season}:${lg.teamId}:${week}`;
 const isDone = (lg, week) => store.get(doneKey(lg, week), false) === true;
@@ -119,6 +137,7 @@ const ICONS = {
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
 };
 function icon(name, size = 20) {
   const s = document.createElement('span');
@@ -133,23 +152,6 @@ const fmtKick = (ms) =>
   ms ? new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
 const slotLabel = (l) => (l.includes('/') ? (l.includes('QB') ? 'SFLX' : 'FLEX') : l);
 const gameStatus = (g) => (g.final ? 'final' : g.kickoff && Date.now() >= g.kickoff ? 'live' : 'upcoming');
-
-/* ---------- team badges: abbreviation on the team's primary colour (no logos) ---------- */
-const TEAM = {
-  ARI: ['#97233F', '#fff'], ATL: ['#A71930', '#fff'], BAL: ['#4B2FA8', '#fff'], BUF: ['#0A4FC2', '#fff'],
-  CAR: ['#0085CA', '#fff'], CHI: ['#C83803', '#fff'], CIN: ['#FB4F14', '#fff'], CLE: ['#5C3A1E', '#fff'],
-  DAL: ['#0A3C9C', '#fff'], DEN: ['#FB4F14', '#fff'], DET: ['#0076B6', '#fff'], GB: ['#2A4A3E', '#FFB612'],
-  HOU: ['#A71930', '#fff'], IND: ['#1750A8', '#fff'], JAC: ['#006778', '#fff'], JAX: ['#006778', '#fff'],
-  KC: ['#E31837', '#fff'], LV: ['#A5ACAF', '#111'], LAC: ['#0080C6', '#fff'], LAR: ['#1D4FB8', '#FFD100'],
-  MIA: ['#008E97', '#fff'], MIN: ['#4F2683', '#fff'], NE: ['#1B3A7A', '#fff'], NO: ['#D3BC8D', '#111'],
-  NYG: ['#1C3A9E', '#fff'], NYJ: ['#125740', '#fff'], PHI: ['#004C54', '#fff'], PIT: ['#FFB612', '#111'],
-  SF: ['#AA0000', '#fff'], SEA: ['#0B2A5B', '#69BE28'], TB: ['#D50A0A', '#fff'], TEN: ['#4B92DB', '#fff'],
-  WAS: ['#7A1F1F', '#fff'], WSH: ['#7A1F1F', '#fff'],
-};
-function badge(abbr) {
-  const [bg, fg] = TEAM[abbr] ?? ['#3a4656', '#fff'];
-  return h('span', { class: 'tbadge', style: `background:${bg};color:${fg}`, text: String(abbr).slice(0, 3) });
-}
 
 /* ---------- bottom sheets ---------- */
 function openSheet(title, ...content) {
@@ -182,6 +184,17 @@ function openLeagueSheet() {
     h(
       'div',
       { class: 'sheetlist' },
+      ...(state.leagues.length > 1
+        ? [
+            h(
+              'button',
+              { class: 'sheetrow allrow', type: 'button', 'aria-current': String(state.active === 'all'), onclick: () => { close(); go('all'); } },
+              icon('layers'),
+              h('span', { class: 'grow' }, h('b', { text: 'All leagues' }), h('small', { text: 'Your players across every league' })),
+              state.active === 'all' ? icon('check') : null
+            ),
+          ]
+        : []),
       ...state.leagues.map((lg) =>
         h(
           'button',
@@ -199,7 +212,7 @@ function openSettingsSheet() {
   const lg = findLeague(state.active);
   const rows = [];
   let close = () => {};
-  if (lg) {
+  if (state.active !== 'add') {
     const hideRow = h(
       'button',
       { class: 'sheetrow', type: 'button', role: 'switch', 'aria-checked': String(state.hideWatched) },
@@ -212,9 +225,11 @@ function openSettingsSheet() {
       hideRow.setAttribute('aria-checked', String(state.hideWatched));
       paint();
     });
+    rows.push(hideRow);
+  }
+  if (lg) {
+    rows.unshift(h('button', { class: 'sheetrow', type: 'button', onclick: () => { close(); renderSetup({ changeTeamFor: lg.leagueId }); } }, h('span', { class: 'grow', text: 'Change team' })));
     rows.push(
-      h('button', { class: 'sheetrow', type: 'button', onclick: () => { close(); renderSetup({ changeTeamFor: lg.leagueId }); } }, h('span', { class: 'grow', text: 'Change team' })),
-      hideRow,
       h(
         'button',
         {
@@ -268,6 +283,7 @@ function go(id) {
   if (id !== 'add') store.set('active', id);
   renderNav();
   if (id === 'add') renderSetup({});
+  else if (id === 'all') loadAll();
   else loadLeague(findLeague(id));
 }
 
@@ -434,14 +450,150 @@ async function loadLeague(lg, { force = false } = {}) {
   }
 }
 
+/* ---------- all leagues ---------- */
+async function ensureMeta(lg, force) {
+  let m = state.meta[lg.leagueId];
+  if (m && !force) return m;
+  const raw = await api('FetchLeagueScoreboard', { league_id: lg.leagueId, season: lg.season });
+  const p = parseScoreboard(raw, lg.teamId);
+  m = { currentWeek: p.currentWeek ?? p.week, weeks: p.weeks.length ? p.weeks : [p.week], sbWeek: p.week };
+  state.meta[lg.leagueId] = m;
+  return m;
+}
+
+async function loadItems(lgs, week, force) {
+  const res = await Promise.allSettled(lgs.map((lg) => getWeek(lg, week, { force })));
+  return lgs.map((lg, i) => ({ lg, d: res[i].status === 'fulfilled' ? res[i].value : null }));
+}
+
+/** One screen for every saved league: who of yours is in each NFL game. */
+async function loadAll({ force = false } = {}) {
+  const seq = ++state.seq;
+  state.view = null;
+  $('nav').hidden = true;
+  main().replaceChildren(h('p', { class: 'muted center pad', text: 'Loading…' }));
+  // Leagues from an older season can't share a week with the current ones.
+  const season = Math.max(...state.leagues.map((l) => l.season));
+  const lgs = state.leagues.filter((l) => l.season === season);
+  try {
+    const metas = (await Promise.allSettled(lgs.map((lg) => ensureMeta(lg, force)))).filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    if (!metas.length) throw new ApiError('Could not load your leagues. Check your connection and try again.');
+    const meta = metas[0];
+    let week = state.allWeek ?? meta.currentWeek;
+    let items = await loadItems(lgs, week, force);
+    if (state.allWeek == null) {
+      // Same catch-up rule as a single league: stay on last week until it's finished.
+      const prev = meta.weeks[meta.weeks.indexOf(week) - 1];
+      const live = items.filter((i) => i.d?.model);
+      if (prev != null && live.length && live.every((i) => allStartersUpcoming(i.d.model)) && lgs.some((lg) => !isDone(lg, prev))) {
+        week = prev;
+        items = await loadItems(lgs, week, force);
+      }
+      state.allWeek = week;
+    }
+    if (seq !== state.seq) return;
+    renderAll(season, week, meta, items);
+  } catch (e) {
+    if (seq !== state.seq) return;
+    main().replaceChildren(
+      h(
+        'section',
+        { class: 'card' },
+        h('p', { class: 'error', text: e instanceof ApiError ? e.message : 'Something went wrong loading your leagues.' }),
+        h('div', { class: 'manage' }, h('button', { class: 'btn', type: 'button', text: 'Try again', onclick: () => loadAll({ force: true }) }))
+      )
+    );
+  }
+}
+
+function renderAll(season, week, meta, items) {
+  const watched = loadWatched(season, week);
+  state.view = { tab: 'all', season, week, meta, items, watched };
+  main().replaceChildren(
+    controls('All leagues', 'layers', meta, week, (w) => {
+      state.allWeek = w;
+      loadAll();
+    }),
+    h('section', { class: 'card' }, h('h2', { text: 'Your matchups' }), h('div', { class: 'mlist', id: 'amlist' })),
+    h('section', { class: 'card' }, gamesHead('NFL games'), h('div', { class: 'games', id: 'games' })),
+    makeOwn()
+  );
+  paint();
+}
+
+/** Union of NFL games across all leagues, plus which of my players (and their opponents) are in each. */
+function unionGames(items) {
+  const games = new Map();
+  const byGame = new Map(); // gameId -> [{lg, me: [], opp: []}]
+  for (const { lg, d } of items) {
+    if (!d?.model) continue;
+    for (const g of d.model.games) games.set(g.id, g);
+    for (const s of d.model.slots) {
+      for (const key of ['me', 'opp']) {
+        const p = s[key];
+        if (p?.gameId == null) continue;
+        let list = byGame.get(p.gameId);
+        if (!list) byGame.set(p.gameId, (list = []));
+        let entry = list.find((x) => x.lg === lg);
+        if (!entry) list.push((entry = { lg, me: [], opp: [] }));
+        entry[key].push(p);
+      }
+    }
+  }
+  return { games: [...games.values()], byGame };
+}
+
+function paintAll(v) {
+  const { items, watched } = v;
+  $('amlist').replaceChildren(
+    ...items.map(({ lg, d }) => {
+      if (!d?.model) {
+        return h('div', { class: 'amrow dim' }, h('div', { class: 'amtxt' }, h('div', { class: 'amvs' }, h('b', { text: lg.teamName })), h('div', { class: 'amsub', text: d ? 'No matchup this week' : "Couldn't load this league" })));
+      }
+      const r = computeReveal(d.model, watched);
+      const done = r.allWatched && r.allFinal;
+      const verdict = !done ? null : r.me > r.opp ? ['W', 'win'] : r.me < r.opp ? ['L', 'loss'] : ['T', 'tie'];
+      return h(
+        'button',
+        { class: 'amrow', type: 'button', onclick: () => go(lg.leagueId), 'aria-label': `Open ${lg.leagueName}` },
+        h(
+          'div',
+          { class: 'amtxt' },
+          h('div', { class: 'amvs' }, h('b', { class: 'me', text: d.matchup.myName }), ' vs ', h('span', { class: 'opp', text: d.matchup.oppName })),
+          h('div', { class: 'amsub', text: `${lg.leagueName} · ${leftText(playersLeft(d.model, 'me', watched))}` })
+        ),
+        r.anyWatched ? h('div', { class: 'amscore' }, h('span', { class: 'me', text: fmtTotal(r.me) }), ' – ', h('span', { class: 'opp', text: fmtTotal(r.opp) })) : null,
+        verdict ? h('span', { class: `wl ${verdict[1]}`, text: verdict[0] }) : null
+      );
+    })
+  );
+  const { games, byGame } = unionGames(items);
+  renderGameList(
+    games,
+    watched,
+    (g) => {
+      // Only my own players here (opponents are in each league's own view).
+      const mine = (byGame.get(g.id) ?? []).filter((e) => e.me.length);
+      if (!mine.length) return h('div', { class: 'lgs dim', text: 'Only opponents in this game' });
+      return h(
+        'div',
+        { class: 'lgs' },
+        ...mine.map((e) => h('div', { class: 'lgline' }, h('span', { class: 'lgname', text: e.lg.leagueName }), h('span', { class: 'm' }, playerList(e.me, watched.has(g.id)))))
+      );
+    },
+    'No NFL games this week.',
+    (g) => {
+      const n = (byGame.get(g.id) ?? []).reduce((t, e) => t + e.me.length, 0);
+      return n ? `${n} of yours` : null;
+    }
+  );
+  syncActions(games.length > 0 && games.every((g) => watched.has(g.id)), watched.size > 0);
+}
+
 /* ---------- controls: team picker, week stepper, tabs ---------- */
-function weekBar(lg, meta, week) {
+function weekBar(meta, week, setWeek) {
   const weeks = meta.weeks;
   const idx = weeks.indexOf(week);
-  const setWeek = (w) => {
-    state.weekByLeague[lg.leagueId] = w;
-    loadLeague(lg);
-  };
   const sel = h(
     'select',
     { 'aria-label': 'NFL week', onchange: (e) => setWeek(Number(e.target.value)) },
@@ -460,12 +612,12 @@ function weekBar(lg, meta, week) {
   );
 }
 
-function controls(lg, meta, week) {
+function controls(label, ic, meta, week, setWeek) {
   return h(
     'div',
     { class: 'controls' },
-    h('button', { class: 'pill teampick', id: 'btn-league', type: 'button', 'aria-label': 'Switch league', onclick: openLeagueSheet }, icon('user'), h('span', { class: 'pt', text: lg.teamName }), icon('chevron', 18)),
-    weekBar(lg, meta, week)
+    h('button', { class: 'pill teampick', id: 'btn-league', type: 'button', 'aria-label': 'Switch league', onclick: openLeagueSheet }, icon(ic), h('span', { class: 'pt', text: label }), icon('chevron', 18)),
+    weekBar(meta, week, setWeek)
   );
 }
 
@@ -479,9 +631,12 @@ const makeOwn = () =>
 function renderLeague(lg, meta, d) {
   renderNav();
   const { week } = d;
-  const ctrl = controls(lg, meta, week);
+  const ctrl = controls(lg.teamName, 'user', meta, week, (w) => {
+    state.weekByLeague[lg.leagueId] = w;
+    loadLeague(lg);
+  });
   const tabs = segBar();
-  const watched = loadWatched(lg, week);
+  const watched = loadWatched(lg.season, week);
   state.view = { lg, meta, data: d, watched, tab: state.tab };
 
   if (state.tab === 'league') {
@@ -609,35 +764,46 @@ function gamesHead(title) {
   );
 }
 
-function gameCard(g, watched, detail) {
+/** "Last names" list; each player's points are appended only when the game is watched. */
+const playerList = (players, revealed) =>
+  players.flatMap((p, i) => [i ? ', ' : '', p.last, revealed ? h('b', { class: 'pv', text: ` ${fmtPts(p.points)}` }) : null]);
+const whoLine = (who, revealed) =>
+  h(
+    'div',
+    { class: revealed ? 'who rev' : 'who' },
+    h('span', { class: 'm' }, 'You: ', who.me.length ? playerList(who.me, revealed) : '—'),
+    h('span', { class: 'sep', text: '|' }),
+    h('span', { class: 'o' }, 'Opp: ', who.opp.length ? playerList(who.opp, revealed) : '—')
+  );
+
+function gameCard(g, watched, detail, extra) {
   const st = gameStatus(g);
   const on = watched.has(g.id);
   const upcoming = st === 'upcoming' && !on;
   const pill = on
-    ? h('span', { class: 'state on' }, icon('check', 16), 'Revealed')
+    ? h('span', { class: 'state on' }, icon('check', 14), 'Revealed')
     : upcoming
-      ? h('span', { class: 'state soon' }, icon('clock', 16), 'Not started')
-      : h('span', { class: 'state' }, icon('eye', 16), 'Hidden');
+      ? h('span', { class: 'state soon' }, icon('clock', 14), 'Not started')
+      : h('span', { class: 'state' }, icon('eye', 14), 'Hidden');
   const when = st === 'final' ? `${fmtKick(g.kickoff)} · Final` : fmtKick(g.kickoff);
   return h(
     'button',
     { class: 'game', type: 'button', 'aria-pressed': String(on), disabled: upcoming, onclick: () => toggleGame(g.id) },
-    h('div', { class: 'gb' }, badge(g.away), badge(g.home)),
     h(
       'div',
       { class: 'gi' },
-      h('div', { class: 'matchupname', text: `${g.away} @ ${g.home}` }),
-      h('div', { class: 'meta' }, when, st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : null)
+      h('span', { class: 'matchupname', text: `${g.away} @ ${g.home}` }),
+      h('span', { class: 'meta' }, when, extra ? ` · ${extra}` : null, st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : null)
     ),
     pill,
     detail
   );
 }
 
-function renderGameList(games, watched, detailFor, emptyText) {
+function renderGameList(games, watched, detailFor, emptyText, extraFor) {
   const list = visibleGames(games, watched);
   const hidden = games.length - list.length;
-  const nodes = list.map((g) => gameCard(g, watched, detailFor(g)));
+  const nodes = list.map((g) => gameCard(g, watched, detailFor(g), extraFor?.(g)));
   if (!games.length) nodes.push(h('p', { class: 'empty-note', text: emptyText }));
   else if (!list.length) nodes.push(h('p', { class: 'empty-note', text: `All ${hidden} watched games hidden.` }));
   $('games').replaceChildren(...nodes);
@@ -647,6 +813,7 @@ function renderGameList(games, watched, detailFor, emptyText) {
 function paint() {
   const v = state.view;
   if (!v) return;
+  if (v.tab === 'all') return paintAll(v);
   if (v.tab === 'league') return paintLeague(v);
   const { lg, data, watched } = v;
   const { model, matchup } = data;
@@ -662,16 +829,6 @@ function paint() {
       if (s.me?.gameId != null) byGame.get(s.me.gameId)?.me.push(s.me);
       if (s.opp?.gameId != null) byGame.get(s.opp.gameId)?.opp.push(s.opp);
     }
-    const playerList = (players, revealed) =>
-      players.flatMap((p, i) => [i ? ', ' : '', p.last, revealed ? h('b', { class: 'pv', text: ` ${fmtPts(p.points)}` }) : null]);
-    const whoLine = (who, revealed) =>
-      h(
-        'div',
-        { class: revealed ? 'who rev' : 'who' },
-        h('span', { class: 'm' }, 'You: ', who.me.length ? playerList(who.me, revealed) : '—'),
-        h('span', { class: 'sep', text: '|' }),
-        h('span', { class: 'o' }, 'Opp: ', who.opp.length ? playerList(who.opp, revealed) : '—')
-      );
     renderGameList(model.games, watched, (g) => whoLine(byGame.get(g.id), watched.has(g.id)), 'No NFL games for these starters this week.');
     syncActions(r.allWatched, r.anyWatched);
   } else {
@@ -742,12 +899,16 @@ function paintLeague(v) {
   syncActions(games.length > 0 && games.every((g) => watched.has(g.id)), watched.size > 0);
 }
 
+const weekOf = (v) => (v.tab === 'all' ? v.week : v.data.week);
+const persist = (v) => saveWatched(v.tab === 'all' ? v.season : v.lg.season, weekOf(v), v.watched);
+const viewGames = (v) => (v.tab === 'all' ? unionGames(v.items).games : v.tab === 'league' ? leagueGames(v.data).games : v.data.model.games);
+
 function toggleGame(id) {
   const v = state.view;
   if (!v) return;
   if (v.watched.has(id)) v.watched.delete(id);
   else v.watched.add(id);
-  saveWatched(v.lg, v.data.week, v.watched);
+  persist(v);
   paint();
 }
 
@@ -755,12 +916,11 @@ function toggleGame(id) {
 function markAll() {
   const v = state.view;
   if (!v) return;
-  const games = v.tab === 'league' ? leagueGames(v.data).games : v.data.model.games;
-  const startable = games.filter((g) => gameStatus(g) !== 'upcoming' && !v.watched.has(g.id));
+  const startable = viewGames(v).filter((g) => gameStatus(g) !== 'upcoming' && !v.watched.has(g.id));
   if (!startable.length) return;
-  if (!confirm(`Reveal ${startable.length} more game${startable.length === 1 ? '' : 's'} for week ${v.data.week}? This can show results.`)) return;
+  if (!confirm(`Reveal ${startable.length} more game${startable.length === 1 ? '' : 's'} for week ${weekOf(v)}? This can show results.`)) return;
   for (const g of startable) v.watched.add(g.id);
-  saveWatched(v.lg, v.data.week, v.watched);
+  persist(v);
   paint();
 }
 
@@ -768,13 +928,14 @@ function resetWeek() {
   const v = state.view;
   if (!v) return;
   v.watched.clear();
-  saveWatched(v.lg, v.data.week, v.watched);
+  persist(v);
   paint();
 }
 
 $('btn-refresh').append(icon('refresh', 22));
 $('btn-settings').append(icon('gear', 22));
 $('btn-refresh').addEventListener('click', () => {
+  if (state.active === 'all') return loadAll({ force: true });
   const lg = state.view?.lg ?? findLeague(state.active);
   if (lg) loadLeague(lg, { force: true });
 });
@@ -782,6 +943,7 @@ $('btn-settings').addEventListener('click', openSettingsSheet);
 
 /* ---------- boot ---------- */
 function boot() {
+  migrateWatched();
   const params = new URLSearchParams(location.search);
   const qLeague = params.get('league');
   if (qLeague && /^\d{1,12}$/.test(qLeague) && !findLeague(qLeague)) {
@@ -790,6 +952,8 @@ function boot() {
     renderSetup({ prefill: qLeague });
   } else if (qLeague && findLeague(qLeague)) {
     go(qLeague);
+  } else if (state.active === 'all' && state.leagues.length > 1) {
+    go('all');
   } else if (state.active && findLeague(state.active)) {
     go(state.active);
   } else if (state.leagues.length) {
