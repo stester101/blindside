@@ -177,6 +177,7 @@ await page.click('text=Load teams');
 await page.getByRole('button', { name: /Tester's Titans/ }).click();
 await page.waitForSelector('#matchup .mside', { timeout: 20000 });
 await page.click('#btn-league');
+ok((await page.locator('.weekbar select').inputValue()) === '8', 'week stays on 8 after adding/switching to another league');
 ok((await page.locator('.leaguerow').count()) === 2, 'two leagues saved in the league switcher');
 await page.keyboard.press('Escape');
 ok((await page.locator('.sheet').count()) === 0, 'sheet closes with Escape');
@@ -199,6 +200,7 @@ await shot('5-superflex');
 await page.click('#btn-league');
 await page.click('.allrow');
 await page.waitForSelector('#amlist .amrow', { timeout: 30000 });
+ok((await page.locator('.weekbar select').inputValue()) === '8', 'All leagues opens on the same week (8)');
 await page.selectOption('.weekbar select', '8');
 await page.waitForFunction(() => document.querySelector('.weekbar select')?.value === '8' && document.querySelectorAll('#amlist .amrow').length === 2 && document.querySelector('#games .game'), null, { timeout: 30000 });
 ok((await page.locator('#amlist .amscore').count()) === 0, 'all-leagues view shows no scores before ticking');
@@ -235,6 +237,21 @@ await waitWeek('8');
 ok((await page.locator('.game[aria-pressed="true"]').count()) === 1, 'legacy per-league watched data is migrated');
 ok((await page.evaluate(() => localStorage.getItem('blindside:v1:watched:219707:2026:8'))) === null, 'legacy key removed after migration');
 await page.click('#btn-reset');
+
+// The week is global: change it in one league, switch to another, and it carries over (and back).
+const weekIs = (w) => page.waitForFunction((w) => document.querySelector('.weekbar select')?.value === w, w, { timeout: 20000 });
+await page.selectOption('.weekbar select', '9');
+await weekIs('9');
+await page.click('#btn-league');
+await page.locator('.leaguerow', { hasText: "Tester's Titans" }).click();
+await weekIs('9');
+ok((await page.locator('.weekbar select').inputValue()) === '9', 'week 9 carries over when switching leagues');
+await page.selectOption('.weekbar select', '8');
+await weekIs('8');
+await page.click('#btn-league');
+await page.locator('.leaguerow', { hasText: 'Chase Spunk' }).click();
+await weekIs('8');
+ok((await page.locator('.weekbar select').inputValue()) === '8', 'and week 8 carries back');
 
 // Narrow (cover-screen-ish) width: no horizontal overflow
 await page.setViewportSize({ width: 320, height: 700 });

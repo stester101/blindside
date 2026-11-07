@@ -61,7 +61,7 @@ const isDone = (lg, week) => store.get(doneKey(lg, week), false) === true;
 const state = {
   leagues: store.get('leagues', []), // [{leagueId, season, leagueName, teamId, teamName}]
   active: store.get('active', null), // leagueId or 'add'
-  weekByLeague: {}, // leagueId -> selected week (in-memory, defaults to current)
+  week: null, // the selected NFL week, shared by every league and the All view (null = pick the default)
   meta: {}, // leagueId -> {currentWeek, weeks}
   cache: new Map(), // `${leagueId}:${season}:${week}` -> view data (in memory only)
   view: null, // current rendered league view
@@ -418,7 +418,8 @@ async function loadLeague(lg, { force = false } = {}) {
       meta = { currentWeek: p.currentWeek ?? p.week, weeks: p.weeks.length ? p.weeks : [p.week], sbWeek: p.week };
       state.meta[lg.leagueId] = meta;
     }
-    let week = state.weekByLeague[lg.leagueId];
+    let week = state.week;
+    if (week != null && !meta.weeks.includes(week)) week = null; // not a week this league has
     const sbFor = (w) => (firstSb && meta.sbWeek === w ? firstSb : null);
     let d;
     if (week == null) {
@@ -431,7 +432,7 @@ async function loadLeague(lg, { force = false } = {}) {
         week = prev;
         d = await getWeek(lg, week, { force });
       }
-      state.weekByLeague[lg.leagueId] = week;
+      state.week = week;
     } else {
       d = await getWeek(lg, week, { force, sbRaw: sbFor(week) });
     }
@@ -480,9 +481,11 @@ async function loadAll({ force = false } = {}) {
     const metas = (await Promise.allSettled(lgs.map((lg) => ensureMeta(lg, force)))).filter((r) => r.status === 'fulfilled').map((r) => r.value);
     if (!metas.length) throw new ApiError('Could not load your leagues. Check your connection and try again.');
     const meta = metas[0];
-    let week = state.allWeek ?? meta.currentWeek;
+    let week = state.week != null && meta.weeks.includes(state.week) ? state.week : null;
+    const pickDefault = week == null;
+    if (pickDefault) week = meta.currentWeek;
     let items = await loadItems(lgs, week, force);
-    if (state.allWeek == null) {
+    if (pickDefault) {
       // Same catch-up rule as a single league: stay on last week until it's finished.
       const prev = meta.weeks[meta.weeks.indexOf(week) - 1];
       const live = items.filter((i) => i.d?.model);
@@ -490,7 +493,7 @@ async function loadAll({ force = false } = {}) {
         week = prev;
         items = await loadItems(lgs, week, force);
       }
-      state.allWeek = week;
+      state.week = week;
     }
     if (seq !== state.seq) return;
     renderAll(season, week, meta, items);
@@ -512,7 +515,7 @@ function renderAll(season, week, meta, items) {
   state.view = { tab: 'all', season, week, meta, items, watched };
   main().replaceChildren(
     controls('All leagues', 'layers', meta, week, (w) => {
-      state.allWeek = w;
+      state.week = w;
       loadAll();
     }),
     h('section', { class: 'card' }, h('h2', { text: 'Your matchups' }), h('div', { class: 'mlist', id: 'amlist' })),
@@ -628,7 +631,7 @@ function renderLeague(lg, meta, d) {
   renderNav();
   const { week } = d;
   const ctrl = controls(lg.teamName, 'user', meta, week, (w) => {
-    state.weekByLeague[lg.leagueId] = w;
+    state.week = w;
     loadLeague(lg);
   });
   const watched = loadWatched(lg.season, week);
