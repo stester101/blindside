@@ -85,6 +85,17 @@ Open the URL in Chrome → **⋮** menu → **Add to home screen** → **Install
 
 Score totals spin like slot-machine reels and lock in left to right when they change; only the digits that change roll. It respects the phone's "reduce motion" setting, in which case numbers just appear.
 
+## Scrubber feasibility test
+
+`scripts/pbp-feasibility.mjs` checks whether public nflverse play-by-play can be joined to your Fleaflicker players and reproduce their points (the groundwork for a "scrub through the game" feature). It needs no install:
+
+```bash
+node scripts/pbp-feasibility.mjs --league 219707 --week 8 --demo
+node scripts/pbp-feasibility.mjs --who "Bucky Irving"     # every play that touched one player
+```
+
+(Add `NODE_USE_ENV_PROXY=1` if you're behind an HTTP proxy.) Play data: nflverse (CC-BY 4.0).
+
 ## "Make this my own"
 
 The button at the bottom of the app downloads `public/make-your-own.md`. It's a self-contained build brief (features, the CORS proxy code, the real Fleaflicker API shapes, the spoiler rules and deploy steps) that anyone can hand to ChatGPT or another assistant to build and customise their own copy.
