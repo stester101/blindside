@@ -125,7 +125,7 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--muted); t
 .pl .p { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pl.mine .p.rev { color: var(--me); }
 .pl.theirs .p.rev { color: var(--opp); }
-.pl .p.hid { color: var(--muted); letter-spacing: .1em; }
+.pl .p.hid { color: var(--muted); font-size: 13px; }
 .pl.empty { opacity: .5; }
 
 .manage { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -153,3 +153,6 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--muted); t
 .left .yet { font-size: 12px; opacity: .8; }
 .scoreline { align-items: start; }
 .vs { padding-top: 30px; padding-bottom: 0; }
+
+/* Total not revealed yet: plain word instead of a number */
+.side .pts.off { color: var(--muted); font-size: 20px; font-weight: 600; line-height: 41px; }

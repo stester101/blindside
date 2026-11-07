@@ -2,7 +2,7 @@
 
 Watching NFL highlights after the games? Blindside keeps your Fleaflicker fantasy matchup hidden. You tick the real NFL games you've watched, and it reveals points only from those games, so your matchup total builds up as you go.
 
-- Everything starts hidden (`••`). There are no scores, player points or win/loss.
+- Everything starts hidden: totals say "Hidden", and players show no points until their game is ticked. There's no win/loss either.
 - Ticking a game reveals the points of every starter (yours and your opponent's) who played in it.
 - The win/loss result stays locked until every relevant game is ticked.
 - You can save several leagues as tabs. Each league remembers your team, and watched games are saved per league and week (all in `localStorage`, on your device only).
@@ -98,7 +98,7 @@ Fleaflicker game `status` is `FINAL_SCORE` once a game is final and absent befor
 ## Spoiler safety
 
 - The raw API JSON is parsed straight into a small in-memory model and then discarded. NFL game scores are never copied into the model.
-- The DOM only ever receives values for watched games. Placeholders are always `••`. The page title is always "Blindside".
+- The DOM only ever receives values for watched games. Unrevealed totals say "Hidden", and unrevealed players have no points line at all. The page title is always "Blindside".
 - There are no `console.log` calls with data, no numbers in error messages, and no scores in `localStorage` (it only stores league/team IDs and watched NFL game IDs).
 - The service worker caches only the app shell. `/api/*` is never cached.
 - The e2e test records every text node that enters the DOM and checks that no point value appears before a game is ticked.

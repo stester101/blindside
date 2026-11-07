@@ -6,7 +6,6 @@ import { parseStandings, parseScoreboard, parseBoxscore, computeReveal } from '.
 
 const DEFAULT_LEAGUE_ID = '219707';
 const KEY = 'blindside:v1:';
-const PLACEHOLDER = '••';
 
 /* ---------- storage ---------- */
 const store = {
@@ -394,9 +393,9 @@ function paint() {
     h(
       'div',
       { class: 'scoreline' },
-      h('div', { class: 'side me' }, h('div', { class: 'tname', text: matchup.myName }), h('div', { class: 'pts', text: show ? fmtTotal(r.me) : PLACEHOLDER }), leftFor('me')),
+      h('div', { class: 'side me' }, h('div', { class: 'tname', text: matchup.myName }), show ? h('div', { class: 'pts', text: fmtTotal(r.me) }) : h('div', { class: 'pts off', text: 'Hidden' }), leftFor('me')),
       h('div', { class: 'vs', text: 'vs' }),
-      h('div', { class: 'side opp right' }, h('div', { class: 'tname', text: matchup.oppName }), h('div', { class: 'pts', text: show ? fmtTotal(r.opp) : PLACEHOLDER }), leftFor('opp'))
+      h('div', { class: 'side opp right' }, h('div', { class: 'tname', text: matchup.oppName }), show ? h('div', { class: 'pts', text: fmtTotal(r.opp) }) : h('div', { class: 'pts off', text: 'Hidden' }), leftFor('opp'))
     ),
     h('div', { class: 'bar', 'aria-hidden': 'true' }, h('i', { class: 'm', style: `width:${mPct}%` }), h('i', { class: 'o', style: `width:${oPct}%` })),
     h('div', { class: 'small muted center', text: `${r.watchedCount} of ${r.total} games watched` }),
@@ -459,15 +458,16 @@ function paint() {
   // Lineups
   const cell = (p, mine) => {
     const cls = mine ? 'pl mine' : 'pl theirs right';
-    if (!p) return h('div', { class: `${cls} empty` }, h('div', { class: 'n', text: 'Empty' }), h('div', { class: 'p hid', text: '—' }));
+    if (!p) return h('div', { class: `${cls} empty` }, h('div', { class: 'n', text: 'Empty' }));
     const rev = p.gameId != null && watched.has(p.gameId);
-    const pts = p.bye ? 'BYE' : p.gameId == null ? '—' : rev ? fmtPts(p.points) : PLACEHOLDER;
+    // Only a revealed score or BYE gets a points line; otherwise nothing is shown.
+    const pts = p.bye ? 'BYE' : rev ? fmtPts(p.points) : null;
     return h(
       'div',
       { class: cls },
       h('div', { class: 'n', text: p.name }),
       h('div', { class: 't', text: [p.pos, p.team].filter(Boolean).join(' · ') }),
-      h('div', { class: `p ${rev ? 'rev' : 'hid'}`, text: pts })
+      pts != null ? h('div', { class: `p ${rev ? 'rev' : 'hid'}`, text: pts }) : null
     );
   };
   $('lineup').replaceChildren(

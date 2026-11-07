@@ -52,9 +52,9 @@ await shot('2-week-now-hidden');
 await page.selectOption('.weekbar select', '8');
 await page.waitForFunction(() => document.querySelector('.weekbar select')?.value === '8' && document.querySelector('#matchup .pts'));
 const pts = () => page.locator('#matchup .pts').allInnerTexts();
-ok(JSON.stringify(await pts()) === JSON.stringify(['••', '••']), 'totals hidden before any game ticked');
+ok(JSON.stringify(await pts()) === JSON.stringify(['Hidden', 'Hidden']), 'totals hidden before any game ticked');
 const hiddenTexts = await page.locator('.pl .p').allInnerTexts();
-ok(hiddenTexts.every((t) => t === '••' || t === 'BYE' || t === '—'), 'all player points hidden');
+ok(hiddenTexts.every((t) => t === 'BYE'), `no player points shown (${hiddenTexts.join(',')})`);
 ok((await page.locator('.result').innerText()).includes('locked'), 'result locked');
 const seenBefore = await page.evaluate(() => window.__seen.join('\n'));
 ok(!/\b\d{1,3}\.\d{1,2}\b/.test(seenBefore), 'no decimal numbers ever entered the DOM before ticking (no flash)');
@@ -93,7 +93,7 @@ ok(/win/i.test(res), `result unlocked: "${res}"`);
 await shot('4-all-watched');
 
 await page.click('#btn-reset');
-ok(JSON.stringify(await pts()) === JSON.stringify(['••', '••']), 'reset hides everything again');
+ok(JSON.stringify(await pts()) === JSON.stringify(['Hidden', 'Hidden']), 'reset hides everything again');
 
 // Second league (superflex)
 await page.click('.tab.add');
