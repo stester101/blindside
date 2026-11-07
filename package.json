@@ -1,0 +1,20 @@
+{
+  "name": "blindside",
+  "version": "1.0.0",
+  "description": "Spoiler-free fantasy NFL tracker for Fleaflicker leagues",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "deploy:cf": "wrangler deploy"
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "express": "^4.21.2"
+  }
+}

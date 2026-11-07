@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Blindside</title>
+  <meta name="description" content="Spoiler-free fantasy football tracker for Fleaflicker">
+  <meta name="theme-color" content="#0b0f14">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <nav id="tabs" class="tabs" aria-label="Leagues"></nav>
+  </header>
+  <main id="app" aria-live="polite">
+    <p class="muted center pad">Loading…</p>
+  </main>
+  <footer id="actions" class="actions" hidden>
+    <button id="btn-reset" class="btn ghost" type="button">Reset</button>
+    <button id="btn-refresh" class="btn ghost icon" type="button" aria-label="Refresh data">↻</button>
+    <button id="btn-all" class="btn primary" type="button">Mark all watched</button>
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
