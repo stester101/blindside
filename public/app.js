@@ -67,6 +67,7 @@ const state = {
   view: null, // current rendered league view
   tab: 'games', // 'games' | 'lineups' | 'league'
   hideWatched: store.get('hideWatched', false) === true,
+  linger: new Map(), // gameId -> {timer, started}: just-watched games kept visible briefly while hiding watched
   seq: 0,
 };
 
@@ -724,10 +725,29 @@ function matchupNodes(model, matchup, watched) {
   };
 }
 
-/** Kickoff order; optionally drop games already watched. */
+const LINGER_MS = 5000;
+
+/** Keep a just-watched game on screen for a few seconds so its points can be read before it's filtered out. */
+function lingerGame(id) {
+  clearTimeout(state.linger.get(id)?.timer);
+  const timer = setTimeout(() => {
+    state.linger.delete(id);
+    paint();
+  }, LINGER_MS);
+  state.linger.set(id, { timer, started: Date.now() });
+}
+function unlinger(id) {
+  clearTimeout(state.linger.get(id)?.timer);
+  state.linger.delete(id);
+}
+function clearLingers() {
+  for (const id of [...state.linger.keys()]) unlinger(id);
+}
+
+/** Kickoff order; optionally drop games already watched (except ones that just were). */
 function visibleGames(games, watched) {
   const sorted = [...games].sort((a, b) => a.kickoff - b.kickoff || a.id - b.id);
-  return state.hideWatched ? sorted.filter((g) => !watched.has(g.id)) : sorted;
+  return state.hideWatched ? sorted.filter((g) => !watched.has(g.id) || state.linger.has(g.id)) : sorted;
 }
 
 /** Games card header: title plus eye (hide watched), mark-all and reset icon buttons. */
@@ -782,9 +802,10 @@ function gameCard(g, watched, detail, extra) {
       ? h('span', { class: 'state soon' }, icon('clock', 14), 'Not started')
       : h('span', { class: 'state' }, icon('eye', 14), 'Hidden');
   const when = st === 'final' ? `${fmtKick(g.kickoff)} · Final` : fmtKick(g.kickoff);
+  const lingering = on && state.hideWatched ? state.linger.get(g.id) : null;
   return h(
     'button',
-    { class: 'game', type: 'button', 'aria-pressed': String(on), disabled: upcoming, onclick: () => toggleGame(g.id) },
+    { class: lingering ? 'game linger' : 'game', type: 'button', 'aria-pressed': String(on), disabled: upcoming, onclick: () => toggleGame(g.id) },
     h(
       'div',
       { class: 'gi' },
@@ -792,7 +813,9 @@ function gameCard(g, watched, detail, extra) {
       h('span', { class: 'meta' }, when, extra ? ` · ${extra}` : null, st === 'live' ? h('span', { class: 'badge live', text: 'LIVE' }) : null)
     ),
     pill,
-    detail
+    detail,
+    // Countdown bar; the negative delay keeps it accurate if the list is re-rendered meanwhile.
+    lingering ? h('span', { class: 'drain', 'aria-hidden': 'true', style: `animation-duration:${LINGER_MS}ms;animation-delay:-${Date.now() - lingering.started}ms` }) : null
   );
 }
 
@@ -902,8 +925,13 @@ const viewGames = (v) => (v.tab === 'all' ? unionGames(v.items).games : v.tab ==
 function toggleGame(id) {
   const v = state.view;
   if (!v) return;
-  if (v.watched.has(id)) v.watched.delete(id);
-  else v.watched.add(id);
+  if (v.watched.has(id)) {
+    v.watched.delete(id);
+    unlinger(id);
+  } else {
+    v.watched.add(id);
+    if (state.hideWatched) lingerGame(id);
+  }
   persist(v);
   paint();
 }
@@ -915,7 +943,10 @@ function markAll() {
   const startable = viewGames(v).filter((g) => gameStatus(g) !== 'upcoming' && !v.watched.has(g.id));
   if (!startable.length) return;
   if (!confirm(`Reveal ${startable.length} more game${startable.length === 1 ? '' : 's'} for week ${weekOf(v)}? This can show results.`)) return;
-  for (const g of startable) v.watched.add(g.id);
+  for (const g of startable) {
+    v.watched.add(g.id);
+    if (state.hideWatched) lingerGame(g.id);
+  }
   persist(v);
   paint();
 }
@@ -924,6 +955,7 @@ function resetWeek() {
   const v = state.view;
   if (!v) return;
   v.watched.clear();
+  clearLingers();
   persist(v);
   paint();
 }

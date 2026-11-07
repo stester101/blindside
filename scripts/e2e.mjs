@@ -115,6 +115,18 @@ ok(!(await navAway()), 'bottom nav returns when scrolling up');
 await page.setViewportSize({ width: 412, height: 915 });
 await page.evaluate(() => window.scrollTo(0, 0));
 await page.waitForTimeout(150);
+// With "hide watched" on, a game you tick stays visible (with its points) for a few seconds first.
+await page.click('#btn-hide');
+await page.locator('.game', { hasText: 'CAR @ GB' }).click();
+const lingerCard = page.locator('.game', { hasText: 'CAR @ GB' });
+ok((await lingerCard.count()) === 1 && /McMillan 8\.8/.test(await lingerCard.innerText()), 'a game ticked while hiding watched stays visible with its points');
+ok((await lingerCard.locator('.drain').count()) === 1, 'it shows a draining countdown bar');
+ok((await page.locator('.game', { hasText: 'TEN @ CIN' }).count()) === 0, 'previously watched games stay hidden meanwhile');
+await page.waitForTimeout(5800);
+ok((await page.locator('.game', { hasText: 'CAR @ GB' }).count()) === 0, 'after a few seconds it is filtered out');
+await page.click('#btn-hide');
+await page.locator('.game', { hasText: 'CAR @ GB' }).click(); // untick again so later steps see one watched game
+ok((await page.locator('.game[aria-pressed="true"]').count()) === 1, 'back to a single watched game');
 const eye = page.locator('#btn-hide');
 ok((await eye.locator('svg').count()) === 1 && (await eye.innerText()).trim() === '', 'hide-watched is an eye icon with no text');
 const own = page.locator('a.own');

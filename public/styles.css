@@ -137,6 +137,14 @@ h3 { font-size: 16px; margin: 0; }
 .game .state { grid-area: s; }
 .game .who, .game .lgs { grid-area: w; }
 .game[aria-pressed="true"] { border-color: rgba(61,220,132,.45); }
+.game { position: relative; overflow: hidden; }
+/* Just-watched game kept visible while "hide watched" is on: a bar drains, then it's filtered out. */
+.drain {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; transform-origin: left;
+  background: linear-gradient(90deg, #3ddc84, #58b0ff); animation: drain linear forwards;
+}
+@keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .drain { animation: none; transform: scaleX(.5); } }
 .game:disabled { opacity: .6; }
 .matchupname { font-weight: 800; font-size: 15px; letter-spacing: .01em; }
 .meta { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
