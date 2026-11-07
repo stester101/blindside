@@ -46,7 +46,16 @@ npx wrangler login      # opens a browser to authorise your Cloudflare account
 npx wrangler deploy     # prints https://blindside.<your-subdomain>.workers.dev
 ```
 
-### Option B: Render (free web service)
+### Option A2: Cloudflare Pages (free, nicer URL: `<name>.pages.dev`)
+
+Same app, served from Pages so the URL doesn't include your account name. `functions/api/[[path]].js` runs the same proxy.
+
+1. Cloudflare dashboard → **Workers & Pages → Create** → **Pages** tab ("Looking to deploy Pages? Get started") → **Import an existing Git repository** → pick `blindside`.
+2. **Project name**: this becomes the URL, e.g. `blindside` → `https://blindside.pages.dev`. If it's taken, try `blindside-nfl` or `blindside-ff`.
+3. Build settings: Framework preset **None**, Build command **empty**, Build output directory **`public`**, Production branch **`main`**.
+4. **Save and Deploy**. Cloudflare may log that it is skipping `wrangler.toml` (that file is for the Worker); that's expected.
+
+
 
 1. Go to <https://dashboard.render.com> → **New** → **Blueprint** → connect GitHub → pick `blindside` → **Apply**. `render.yaml` sets everything up.
    Or use **New → Web Service**: Runtime *Node*, Build `npm install`, Start `npm start`, Instance type *Free*.
