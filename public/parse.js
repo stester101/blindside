@@ -88,6 +88,7 @@ function parsePlayer(p, games) {
   return {
     id: pp.id,
     name: pp.nameShort || pp.nameFull || 'Unknown',
+    last: pp.nameLast || (pp.nameShort || pp.nameFull || 'Unknown').split(' ').slice(1).join(' ') || 'Unknown',
     pos: pp.position ?? '',
     team,
     gameId,

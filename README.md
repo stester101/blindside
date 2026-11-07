@@ -5,7 +5,7 @@ Watching NFL highlights after the games? Blindside keeps your Fleaflicker fantas
 - Everything starts hidden: totals say "Hidden", and players show no points until their game is ticked. There's no win/loss either.
 - Ticking a game reveals the points of every starter (yours and your opponent's) who played in it.
 - The win/loss result stays locked until every relevant game is ticked.
-- You can save several leagues as tabs. Each league remembers your team, and watched games are saved per league and week (all in `localStorage`, on your device only).
+- You can save several leagues and switch between them from the team picker. Each league remembers your team, and watched games are saved per league and week (all in `localStorage`, on your device only).
 - It's a mobile-first, dark-theme PWA you can install to your home screen.
 
 ## How it works
@@ -70,11 +70,12 @@ Open the URL in Chrome → **⋮** menu → **Add to home screen** → **Install
 ## Using it
 
 1. On first launch the league ID **219707** is pre-filled and its teams load. Tap your team.
-2. Tap **+** to add more leagues (e.g. `332885`). Each league becomes a tab showing your team name.
-3. The week picker opens on the current NFL week. The exception: if none of this week's starters have kicked off yet and you haven't finished last week, it opens on last week (handy for Monday night catch-up). Use ‹ › or the dropdown to change it.
+2. Tap your team name at the top to switch leagues, or choose **Add league** to add another (e.g. `332885`).
+3. The week picker opens on the current NFL week. The exception: if none of this week's starters have kicked off yet and you haven't finished last week, it opens on last week (handy for Monday night catch-up). Use ‹ › or tap the week to change it.
 4. Tick the games you've watched. The eye icon next to "NFL games" hides or shows games you've already ticked. Games are listed in kickoff order. Each ticked game shows its players' points. Games that haven't kicked off can't be ticked. Games in progress show **LIVE**, and ticking one reveals the points so far.
-5. **League** (next to **Mine**) shows every matchup in the league with the same tick-to-reveal, using the same ticked games.
-6. **Mark all watched** asks for confirmation first, because it can reveal the result. **Reset** hides everything again for that week. **↻** re-fetches from Fleaflicker.
+5. The **Games / Lineups / League** tabs switch views. **Lineups** shows both starting lineups side by side. **League** shows every matchup in the league with the same tick-to-reveal, using the same ticked games.
+6. On the games list, the ✓ icon marks everything watched (it asks first, because it can reveal the result), ↺ hides everything again for that week, and the eye hides or shows games you've already ticked. The refresh icon at the top re-fetches from Fleaflicker, and the gear has change team, remove league and more.
+7. Team badges are the team abbreviation on the team's colour. There are no NFL logos, which are trademarked.
 
 **Sharing with league mates:** send them `https://<your-url>/?league=<their league id>`. That pre-fills the league ID so they just tap their own team. Nothing in the app is tied to one person.
 

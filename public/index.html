@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Blindside</title>
   <meta name="description" content="Spoiler-free fantasy football tracker for Fleaflicker">
-  <meta name="theme-color" content="#0b0f14">
+  <meta name="theme-color" content="#060a12">
   <meta name="color-scheme" content="dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,17 +16,23 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="top">
-    <nav id="tabs" class="tabs" aria-label="Leagues"></nav>
+  <header class="appbar">
+    <div class="brand">
+      <img src="icons/icon.svg" alt="" width="40" height="40">
+      <div>
+        <div class="wordmark">BLINDSIDE</div>
+        <div class="tag">Fantasy NFL · Spoiler-Free</div>
+      </div>
+    </div>
+    <div class="barbtns">
+      <button id="btn-refresh" class="iconbtn lg" type="button" aria-label="Refresh data"></button>
+      <button id="btn-settings" class="iconbtn lg" type="button" aria-label="Settings"></button>
+    </div>
   </header>
   <main id="app" aria-live="polite">
     <p class="muted center pad">Loading…</p>
   </main>
-  <footer id="actions" class="actions" hidden>
-    <button id="btn-reset" class="btn ghost" type="button">Reset</button>
-    <button id="btn-refresh" class="btn ghost icon" type="button" aria-label="Refresh data">↻</button>
-    <button id="btn-all" class="btn primary" type="button">Mark all watched</button>
-  </footer>
+  <nav id="nav" class="bottomnav" aria-label="Sections" hidden></nav>
   <script type="module" src="app.js"></script>
 </body>
 </html>
