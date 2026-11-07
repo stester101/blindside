@@ -1,6 +1,8 @@
 name = "blindside"
 main = "worker.js"
 compatibility_date = "2025-06-01"
+# Always serve on https://blindside.<account>.workers.dev
+workers_dev = true
 
 [assets]
 directory = "./public"
