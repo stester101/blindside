@@ -1,9 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0b0f14"/>
-  <ellipse cx="256" cy="256" rx="176" ry="112" fill="#3ddc84" transform="rotate(-35 256 256)"/>
-  <g stroke="#0b0f14" stroke-width="16" stroke-linecap="round" transform="rotate(-35 256 256)">
-    <line x1="196" y1="256" x2="316" y2="256"/>
-    <line x1="226" y1="236" x2="226" y2="276"/><line x1="256" y1="236" x2="256" y2="276"/><line x1="286" y1="236" x2="286" y2="276"/>
-  </g>
-  <rect x="64" y="226" width="384" height="64" rx="32" fill="#e8edf2" transform="rotate(35 256 256)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0b0f14"/>
+<rect x="80" y="156" width="152" height="200" rx="28" fill="#3ddc84"/>
+<rect x="280" y="156" width="152" height="200" rx="28" fill="#ff8a5c"/>
+<rect x="116" y="242" width="80" height="28" rx="14" fill="#0b0f14"/>
+<rect x="316" y="242" width="80" height="28" rx="14" fill="#0b0f14"/>
+<circle cx="256" cy="226" r="11" fill="#e8edf2"/><circle cx="256" cy="286" r="11" fill="#e8edf2"/>
 </svg>
