@@ -134,3 +134,17 @@ Fleaflicker game `status` is `FINAL_SCORE` once a game is final and absent befor
 - There are no `console.log` calls with data, no numbers in error messages, and no scores in `localStorage` (it only stores league/team IDs and watched NFL game IDs).
 - The service worker caches only the app shell. `/api/*` is never cached.
 - The e2e test records every text node that enters the DOM and checks that no point value appears before a game is ticked.
+
+## Live replay (beta)
+
+`live.html` lets you step through one NFL game one scoring play at a time (Settings, "Live replay (beta)").
+Play data is static JSON in `public/data/pbp/<season>/<week>/<AWAY>@<HOME>.json`, built from nflverse
+play-by-play (CC BY 4.0). Fleaflicker only gives whole-game points, so running points are approximate (`~`) and the
+exact Fleaflicker numbers are applied when you press "Finish game". Rebuild after games finish, then commit
+`public/data`:
+
+    NODE_USE_ENV_PROXY=1 npm run build:pbp          # NODE_USE_ENV_PROXY only if you are behind an HTTP proxy
+    node scripts/build-pbp.mjs --season 2026 --week 9
+
+Tests: `npm test`; browser check against the real API: start the app on a free port, then
+`node scripts/e2e-live.mjs http://localhost:8788 [screenshotDir]`.

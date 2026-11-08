@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Blindside Live Replay</title>
+  <meta name="description" content="Step through an NFL game one scoring play at a time, spoiler-free">
+  <meta name="theme-color" content="#060a12">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="live.css">
+</head>
+<body class="livepage">
+  <header class="appbar">
+    <div class="brand">
+      <a class="backlink" href="./" aria-label="Back to Blindside">&#8249; Blindside</a>
+    </div>
+    <div class="tag livetag">Live replay (beta)</div>
+  </header>
+  <main id="app">
+    <p class="muted center pad">Loading&hellip;</p>
+  </main>
+  <div id="livebar" class="livebar" hidden></div>
+  <script type="module" src="live.js"></script>
+</body>
+</html>

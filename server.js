@@ -24,6 +24,8 @@ app.use(
     setHeaders(res, file) {
       // The service worker and HTML must always revalidate so updates roll out.
       if (/\.(html|webmanifest)$|sw\.js$/.test(file)) res.setHeader('cache-control', 'no-cache');
+      // Play-by-play files are spoilers: keep them out of every cache.
+      if (file.includes(`${path.sep}data${path.sep}`)) res.setHeader('cache-control', 'no-store');
     },
   })
 );

@@ -315,6 +315,7 @@ function openSettingsSheet() {
       )
     );
   }
+  if (state.leagues.length) rows.push(h('a', { class: 'sheetrow', href: 'live.html' }, h('span', { class: 'grow' }, h('b', { text: 'Live replay (beta)' }), h('small', { text: 'Step through a game one scoring play at a time' }))));
   rows.push(h('a', { class: 'sheetrow', href: 'make-your-own.md', download: 'blindside-make-your-own.md' }, h('span', { class: 'grow', text: 'Make this my own' })));
   close = openSheet('Settings', h('div', { class: 'sheetlist' }, ...rows));
 }

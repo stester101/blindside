@@ -1,0 +1,70 @@
+/* Live Replay (beta). Extends styles.css tokens. */
+.livepage { padding-bottom: calc(96px + var(--safe-b)); }
+.backlink { text-decoration: none; font-weight: 800; font-size: 17px; min-height: 40px; display: inline-flex; align-items: center; padding-right: 10px; }
+.livetag { font-size: 12px; }
+.selpill { flex: 1; min-width: 0; display: flex; align-items: center; padding: 0 6px; }
+.selpill select {
+  width: 100%; min-width: 0; height: 36px; border: 0; background: transparent; color: var(--text);
+  font-size: 15px; font-weight: 600; text-align: center; text-align-last: center; appearance: none;
+}
+.selpill select option { background: var(--bg2); color: var(--text); }
+.credit a { color: var(--accent); }
+.hint { margin: 0 2px 6px; }
+.hint:empty { display: none; }
+
+.gamehead { display: grid; gap: 6px; }
+.gamehead .row { justify-content: space-between; }
+.gteams { font-size: 20px; font-weight: 800; font-style: italic; }
+.small-btn { min-height: 34px; font-size: 13px; }
+
+/* Feed */
+.feed { display: grid; gap: 8px; }
+.pcard {
+  background: linear-gradient(180deg, rgba(20,32,54,.6), rgba(11,18,32,.85));
+  border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; min-width: 0;
+}
+.pcard.final { border-color: var(--accent); }
+.pcard.enter { animation: reveal .35s ease-out; }
+@keyframes reveal { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pcard.enter { animation: none; } }
+.phead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.clock { font-weight: 700; font-variant-numeric: tabular-nums; }
+.pteam { color: var(--muted); font-size: 13px; }
+.pscore { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 14px; }
+.chip { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; background: var(--line); letter-spacing: .03em; }
+.chip.t-TD { background: var(--me); color: #04111f; }
+.chip.t-FG { background: var(--accent); color: #04111f; }
+.chip.t-XP, .chip.t-2PT { background: #c9d3de; color: #04111f; }
+.chip.t-SAF { background: var(--warn); color: #201800; }
+.chip.t-FINAL { background: var(--accent); color: #04111f; }
+.pwho { margin-top: 4px; font-size: 15px; overflow-wrap: anywhere; }
+.phow { color: var(--muted); font-size: 13px; }
+.pdesc { margin-top: 2px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+
+.impact { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.sides { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.side { min-width: 0; }
+.slabel { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.side.me .slabel, .side.me .pv { color: var(--me); }
+.side.opp .slabel, .side.opp .pv { color: var(--opp); }
+.prow { display: flex; align-items: baseline; gap: 5px; font-size: 13px; min-width: 0; }
+.prow.none { color: var(--muted); }
+.pn { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pd { flex: none; min-width: 34px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sub { margin-top: 5px; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.sub .m { color: var(--me); }
+.sub .o { color: var(--opp); }
+.subnote { font-weight: 400; font-size: 11px; color: var(--muted); }
+.impact .lgname { margin-bottom: 2px; }
+
+/* Thumb-reach action bar */
+.livebar {
+  position: fixed; left: 8px; right: 8px; bottom: calc(8px + var(--safe-b)); z-index: 6;
+  max-width: 544px; margin: 0 auto; display: flex; gap: 8px; padding: 8px;
+  background: rgba(11,18,32,.95); border: 1px solid var(--line); border-radius: 20px;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.bigbtn { flex: 1; min-height: 56px; font-size: 18px; font-weight: 800; border-radius: 14px; }
+.resetbtn { min-height: 56px; padding: 0 12px; border-radius: 14px; font-size: 13px; }
+@media (max-width: 360px) { .resetbtn { padding: 0 8px; font-size: 12px; } .bigbtn { font-size: 16px; } .pscore { margin-left: 0; } }

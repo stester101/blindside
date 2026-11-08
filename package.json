@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "node server.js",
+    "build:pbp": "node scripts/build-pbp.mjs",
     "test": "node --test test/*.test.js",
     "deploy:cf": "wrangler deploy"
   },
