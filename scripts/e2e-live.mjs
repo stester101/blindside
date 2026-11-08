@@ -202,7 +202,9 @@ ok(plays.length > 10, `test oracle loaded (${plays.length} scoring plays in TEN@
     const u = new URL(route.request().url());
     if (u.searchParams.get('league_id') === '999999') {
       u.searchParams.set('league_id', '219707');
-      return route.fulfill({ response: await route.fetch({ url: u.toString() }) });
+      // Node's fetch (not route.fetch) so this also works against a remote BASE behind an HTTP proxy.
+      const r = await fetch(u.toString());
+      return route.fulfill({ status: r.status, contentType: 'application/json', body: await r.text() });
     }
     return route.continue();
   });
