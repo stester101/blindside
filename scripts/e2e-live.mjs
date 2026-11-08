@@ -2,6 +2,7 @@
 // Usage: NODE_PATH=$(npm root -g) node scripts/e2e-live.mjs [baseUrl] [screenshotDir]
 // Start the app first, e.g.  NODE_USE_ENV_PROXY=1 PORT=8788 node server.js
 import { createRequire } from 'node:module';
+import { groupPlays } from '../public/live-core.js';
 const req = createRequire(import.meta.url);
 // Playwright is normally global: NODE_PATH=$(npm root -g) works; otherwise look next to the node binary.
 const { chromium } = (() => {
@@ -45,8 +46,12 @@ const shot = async (page, name) => SHOTS && page.screenshot({ path: `${SHOTS}/${
 
 // Oracle: the game file itself (only used by the test to know what must NOT be on screen yet).
 const gameFile = await (await fetch(`${BASE}/data/pbp/2026/8/TEN-CIN.json`)).json();
-const plays = gameFile.plays;
-ok(plays.length > 10, `test oracle loaded (${plays.length} scoring plays in TEN@CIN week 8)`);
+// One oracle entry per CARD: a touchdown and its extra point share a card (see groupPlays).
+const plays = groupPlays(gameFile.plays).map((grp) => {
+  const end = gameFile.plays[grp.end];
+  return { ...grp.main, a: end.a, h: end.h };
+});
+ok(plays.length > 10, `test oracle loaded (${plays.length} cards in TEN@CIN week 8, from ${gameFile.plays.length} scoring plays)`);
 
 /* ------------------------------------------------------------ single league, reduced motion */
 {
@@ -98,10 +103,12 @@ ok(plays.length > 10, `test oracle loaded (${plays.length} scoring plays in TEN@
     const total = plays[i].a + plays[i].h;
     scoreOk &&= head === expect && total >= lastTotal;
     lastTotal = total;
-    const sub = await top.locator('.sub').innerText();
-    timeline.push(sub.replace(/\s+/g, ' '));
+    // Cards where none of our starters changed have no subtotal line (they are collapsed), so only read it when present.
+    const subEl = top.locator('.sub');
+    const sub = (await subEl.count()) ? (await subEl.innerText()).replace(/\s+/g, ' ') : '';
+    if (sub) timeline.push(sub);
     if (i === 2) await shot(page, '2-after-3-presses');
-    if (i < plays.length - 1) ok(true, `press ${i + 1}: ${(await top.locator('.clock').innerText())} ${(await top.locator('.chip').innerText())} ${plays[i].scorer} | ${sub.replace(/\s+/g, ' ')}`);
+    if (i < plays.length - 1) ok(true, `press ${i + 1}: ${(await top.locator('.clock').innerText())} ${(await top.locator('.chip').innerText())} ${plays[i].scorer || plays[i].team} | ${sub || '(no change for our starters)'}`);
   }
   ok(oneAtATime, 'each press adds exactly one card');
   ok(allAbsent, 'later plays (description and scorer) never appeared early');
@@ -121,6 +128,10 @@ ok(plays.length > 10, `test oracle loaded (${plays.length} scoring plays in TEN@
   await page.reload();
   await page.waitForSelector('.pcard.play', { timeout: 60000 });
   ok((await cards(page)) === plays.length, 'reload resumes exactly the plays already revealed');
+  await page.locator('.refit').click();
+  // The bottom bar is hidden while the game reloads; wait until it is back with the restored feed.
+  await page.waitForFunction((n) => !document.getElementById('livebar').hidden && document.querySelectorAll('.pcard.play').length === n, plays.length, { timeout: 60000 });
+  ok((await cards(page)) === plays.length, 'Recalculate league scoring refits and keeps the progress');
   ok((await page.locator('#nextbtn').innerText()) === 'Finish game', 'reload keeps the Finish button state');
   await page.evaluate(() => window.scrollTo(0, 0));
 
@@ -214,10 +225,18 @@ ok(plays.length > 10, `test oracle loaded (${plays.length} scoring plays in TEN@
   ok((await page.locator('.game[data-game="TEN@CIN"] .lgline').count()) === 2, 'game list shows one You/Opp block per league');
   await page.locator('.game[data-game="TEN@CIN"]').click();
   await page.waitForSelector('#nextbtn', { timeout: 60000 });
+  // Cards where none of our starters changed show no block at all, so press until the first card that has one.
+  let presses = 1;
   await page.locator('#nextbtn').click();
-  ok((await page.locator('.pcard.play .impact').count()) === 2, 'a scoring play card shows one block per league');
-  for (let i = 1; i < plays.length; i++) await page.locator('#nextbtn').click();
-  await page.locator('#nextbtn').click();
+  while (!(await page.locator('.pcard.play').first().locator('.impact').count()) && presses < plays.length) {
+    await page.locator('#nextbtn').click();
+    presses++;
+  }
+  ok((await page.locator('.pcard.play').first().locator('.impact').count()) === 2, `a card where our players change shows one block per league (after ${presses} press${presses === 1 ? '' : 'es'})`);
+  ok(presses < plays.length, 'empty cards are collapsed: some cards show no block at all');
+  // Press through to the end: the remaining cards, then the final card.
+  // plays.length cards in total, then one more press to finish.
+  for (let i = presses + 1; i <= plays.length + 1; i++) await page.locator('#nextbtn').click();
   await page.waitForSelector('.pcard.final');
   const subs = (await page.locator('.pcard.final .sub').allInnerTexts()).map((s) => s.replace(/\s+/g, ' '));
   ok(subs.length === 2 && subs.every((s) => /You 49\.48 . Opp 37\.70/.test(s)), `All leagues finish: exact numbers per league (${subs.join(' | ')})`);

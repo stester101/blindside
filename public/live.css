@@ -68,3 +68,7 @@
 .bigbtn { flex: 1; min-height: 56px; font-size: 18px; font-weight: 800; border-radius: 14px; }
 .resetbtn { min-height: 56px; padding: 0 12px; border-radius: 14px; font-size: 13px; }
 @media (max-width: 360px) { .resetbtn { padding: 0 8px; font-size: 12px; } .bigbtn { font-size: 16px; } .pscore { margin-left: 0; } }
+
+/* Extra point / two-point try shares its touchdown's card */
+.pdesc.extra { margin-top: 2px; font-size: 12px; opacity: .85; }
+.refit { margin: 8px auto 0; display: block; }

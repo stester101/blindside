@@ -6,6 +6,7 @@ import {
   DEFAULT_PROFILE, FEATURES, buildNameIndex, joinPlayer, normName, gameTotals, runningPoints, trueUp, ridgeFit, fitProfile, snapValue, dot, fmtClock,
 } from '../public/live-core.js';
 import { playEffects, buildGame, csvRows, ffTeam } from '../scripts/pbp-lib.mjs';
+import { groupPlays } from '../public/live-core.js';
 
 const P = (o) => ({
   id: 0, week: 8, qtr: 1, qsec: 600, type: 'pass', posteam: 'CIN', defteam: 'TEN', away: 'TEN', home: 'CIN', gid: 'g', desc: 'x',
@@ -156,4 +157,23 @@ test('public file names are URL-safe (an "@" or other encoded char makes Cloudfl
   };
   walk('public');
   assert.deepEqual(bad, []);
+});
+
+test('cards: a touchdown and its extra point share one card; other plays stand alone', () => {
+  const plays = [
+    { type: 'FG', team: 'TEN' },
+    { type: 'TD', team: 'TEN' },
+    { type: 'XP', team: 'TEN' },
+    { type: 'TD', team: 'CIN' },
+    { type: 'FG', team: 'TEN' },
+    { type: 'TD', team: 'TEN' },
+    { type: 'XP', team: 'CIN' }, // different team: not the same score, so not merged
+  ];
+  const g = groupPlays(plays);
+  assert.deepEqual(g.map((x) => [x.start, x.end]), [[0, 0], [1, 2], [3, 3], [4, 4], [5, 5], [6, 6]]);
+  assert.equal(g[1].main.type, 'TD');
+  assert.equal(g[1].extra.type, 'XP');
+  const two = groupPlays([{ type: 'TD', team: 'BUF' }, { type: '2PT', team: 'BUF' }]);
+  assert.equal(two.length, 1);
+  assert.equal(two[0].extra.type, '2PT');
 });

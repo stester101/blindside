@@ -184,3 +184,22 @@ export function fitProfile(rows, { minSamples = 20, maxMae = 1.5 } = {}) {
 
 /* --------------------------------------------------------------- display */
 export const fmtClock = (q, sec) => `${q > 4 ? 'OT' : 'Q' + q} ${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+/**
+ * One card per scoring play, except a touchdown and the extra point or two-point try that
+ * immediately follows it for the same team, which share a card. Indices refer to `plays`.
+ */
+export function groupPlays(plays) {
+  const groups = [];
+  for (let i = 0; i < plays.length; i++) {
+    const p = plays[i];
+    const nx = plays[i + 1];
+    if (p.type === 'TD' && nx && (nx.type === 'XP' || nx.type === '2PT') && nx.team === p.team) {
+      groups.push({ start: i, end: i + 1, main: p, extra: nx });
+      i++;
+    } else {
+      groups.push({ start: i, end: i, main: p, extra: null });
+    }
+  }
+  return groups;
+}

@@ -4,7 +4,7 @@
 // No console output, no data in attributes/titles, the page title never changes.
 import { parseScoreboard, parseBoxscore } from './parse.js';
 import {
-  buildNameIndex, joinPlayer, gameTotals, runningPoints, fitProfile, DEFAULT_PROFILE, FEATURES, round2, fmtClock,
+  buildNameIndex, joinPlayer, gameTotals, runningPoints, fitProfile, DEFAULT_PROFILE, FEATURES, round2, fmtClock, groupPlays,
 } from './live-core.js';
 
 const KEY = 'blindside:v1:';
@@ -378,9 +378,10 @@ async function openGame(g) {
       };
       return { lg: e.lg, me: e.me.map(mk), opp: e.opp.map(mk) };
     });
-    const total = file.plays.length;
+    const groups = groupPlays(file.plays);
+    const total = groups.length;
     const saved = store.get(progKey(season, state.week, key), 0);
-    const sess = { g, file, blocks, total, n: Number.isInteger(saved) ? Math.max(0, Math.min(total + 1, saved)) : 0, key, season, week: state.week };
+    const sess = { g, file, blocks, groups, total, n: Number.isInteger(saved) ? Math.max(0, Math.min(total + 1, saved)) : 0, key, season, week: state.week };
     state.game = sess;
     writeHash({ l: state.mode, w: state.week, g: key });
     renderGame(sess);
@@ -403,7 +404,8 @@ function renderGame(s) {
     h('div', { class: 'row' }, kick, h('button', { class: 'btn ghost small-btn', type: 'button', text: 'Change game', onclick: () => showList(state.week) })),
     h('div', { class: 'who' }, ...blocks_names(s))
   );
-  main().replaceChildren(head, h('p', { id: 'hint', class: 'hint muted small' }), feed, h('p', { class: 'small muted pad credit' }, 'Play data: ', h('a', { href: 'https://github.com/nflverse/nflverse-data', text: 'nflverse', rel: 'noopener' }), ' (CC BY 4.0). Defenses and any player we cannot match show up when you finish the game.'));
+  const refit = h('button', { class: 'btn ghost small-btn refit', type: 'button', text: 'Recalculate league scoring', onclick: () => refitScoring(s) });
+  main().replaceChildren(head, h('p', { id: 'hint', class: 'hint muted small' }), feed, h('p', { class: 'small muted pad credit' }, 'Play data: ', h('a', { href: 'https://github.com/nflverse/nflverse-data', text: 'nflverse', rel: 'noopener' }), ' (CC BY 4.0). Defenses and any player we cannot match show up when you finish the game.'), refit);
   // Newest card first. Resume: rebuild the cards already seen, no animation.
   for (let k = 0; k < Math.min(s.n, s.total); k++) feed.prepend(playCard(s, k, false));
   if (s.n > s.total) feed.prepend(finalCard(s, false));
@@ -447,6 +449,15 @@ function advance(s) {
   else window.scrollTo(0, 0);
 }
 
+async function refitScoring(s) {
+  for (const b of s.blocks) {
+    store.del(profKey(b.lg));
+    state.profiles.delete(b.lg.leagueId);
+  }
+  state.files.clear();
+  openGame(s.g);
+}
+
 function resetGame(s) {
   if (!confirm('Reset this game back to the start? Your progress here will be cleared.')) return;
   s.n = 0;
@@ -460,10 +471,12 @@ function resetGame(s) {
 const TYPE_LABEL = { TD: 'TD', FG: 'FG', XP: 'XP', '2PT': '2PT', SAF: 'SAF', PTS: 'PTS' };
 
 function playCard(s, k, animate) {
-  const pl = s.file.plays[k];
+  const grp = s.groups[k];
+  const pl = grp.main;
+  const end = s.file.plays[grp.end];
   const { g } = s;
   const how = pl.how ? (pl.by ? `${pl.how} from ${pl.by}` : pl.how) : '';
-  const score = `${g.away} ${pl.a} – ${g.home} ${pl.h}`;
+  const score = `${g.away} ${end.a} – ${g.home} ${end.h}`;
   const head = h(
     'div',
     { class: 'phead' },
@@ -473,23 +486,26 @@ function playCard(s, k, animate) {
     h('span', { class: 'pscore', text: score })
   );
   const who = h('div', { class: 'pwho' }, h('b', { text: pl.scorer || pl.team }), how ? h('span', { class: 'phow', text: ` ${how}` }) : null);
-  const blocks = s.blocks.map((b) => impactBlock(s, b, k));
-  return h('article', { class: animate && !reduceMotion() ? 'pcard play enter' : 'pcard play' }, head, who, pl.desc ? h('div', { class: 'pdesc', text: pl.desc }) : null, ...blocks);
+  const extra = grp.extra ? h('div', { class: 'pdesc extra', text: `${grp.extra.type === '2PT' ? 'Two-point try' : 'Extra point'}: ${grp.extra.desc || grp.extra.scorer || ''}` }) : null;
+  // Only blocks where one of the user's or opponent's starters actually changed on this card.
+  const blocks = s.blocks.map((b) => impactBlock(s, b, grp)).filter(Boolean);
+  return h('article', { class: animate && !reduceMotion() ? 'pcard play enter' : 'pcard play' }, head, who, pl.desc ? h('div', { class: 'pdesc', text: pl.desc }) : null, extra, ...blocks);
 }
 
-function impactBlock(s, b, k) {
+function impactBlock(s, b, grp) {
+  const now = (x) => x.at(grp.end);
+  const before = (x) => (grp.start ? x.at(grp.start - 1) : 0);
+  const changed = (list) => list.filter((x) => Math.abs(now(x) - before(x)) >= 0.005);
+  if (!changed(b.me).length && !changed(b.opp).length) return null;
   const rowsFor = (list) =>
-    list
-      .map((x) => ({ x, now: x.at(k), prev: k ? x.at(k - 1) : 0 }))
-      .filter((r) => Math.abs(r.now - r.prev) >= 0.005)
-      .map((r) =>
-        h('div', { class: 'prow' }, h('span', { class: 'pn', text: r.x.p.last }), h('span', { class: 'pv', text: approx(r.now) }), h('span', { class: 'pd', text: sign(r.now - r.prev) }))
-      );
+    changed(list).map((x) => ({ x, now: now(x), prev: before(x) })).map((r) =>
+      h('div', { class: 'prow' }, h('span', { class: 'pn', text: r.x.p.last }), h('span', { class: 'pv', text: approx(r.now) }), h('span', { class: 'pd', text: sign(r.now - r.prev) }))
+    );
   const col = (cls, label, list) => {
     const rows = rowsFor(list);
     return h('div', { class: `side ${cls}` }, h('div', { class: 'slabel', text: label }), rows.length ? rows : h('div', { class: 'prow none', text: '—' }));
   };
-  const sum = (list) => list.reduce((t, x) => t + x.at(k), 0);
+  const sum = (list) => list.reduce((t, x) => t + now(x), 0);
   return h(
     'div',
     { class: 'impact' },
