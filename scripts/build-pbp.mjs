@@ -79,7 +79,8 @@ for (const gp of games.values()) {
   const { game, odd } = buildGame(gp, { season: SEASON, nameOf, posOf });
   const key = `${game.away}@${game.home}`;
   const dir = path.join(OUT, String(SEASON), String(game.week));
-  const file = path.join(dir, `${key}.json`);
+  // File names use '-' not '@': Cloudflare redirects '@' URLs to '%40', and browsers send them straight back (redirect loop).
+  const file = path.join(dir, `${game.away}-${game.home}.json`);
   const body = JSON.stringify(game);
   fs.mkdirSync(dir, { recursive: true });
   if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === body) unchanged++;

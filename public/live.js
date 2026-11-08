@@ -143,7 +143,7 @@ async function fetchGameFile(season, week, key) {
   const ck = `${season}/${week}/${key}`;
   if (state.files.has(ck)) return state.files.get(ck);
   // no-store: play data must never be kept by the HTTP cache or the service worker.
-  const r = await fetch(`data/pbp/${season}/${week}/${key}.json`, { cache: 'no-store' });
+  const r = await fetch(`data/pbp/${season}/${week}/${key.replace('@', '-')}.json`, { cache: 'no-store' });
   if (!r.ok) throw new ApiError('Play data for this game is not available.');
   const f = await r.json();
   if (!f || !Array.isArray(f.plays) || !Array.isArray(f.effects) || !Array.isArray(f.players) || !Array.isArray(f.fx)) throw new ApiError('Play data for this game is not readable.');

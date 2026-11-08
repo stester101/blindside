@@ -134,7 +134,7 @@ test('misc: clock, team spelling, csv quoting', () => {
 });
 
 test('generated data: week 8 TEN@CIN file is small, ordered, and ends at the real final score', () => {
-  const f = 'public/data/pbp/2026/8/TEN@CIN.json';
+  const f = 'public/data/pbp/2026/8/TEN-CIN.json';
   const g = JSON.parse(fs.readFileSync(f, 'utf8'));
   assert.ok(fs.statSync(f).size < 40 * 1024);
   const last = g.plays[g.plays.length - 1];
@@ -143,4 +143,17 @@ test('generated data: week 8 TEN@CIN file is small, ordered, and ends at the rea
   const burrow = g.players.findIndex((p) => p[1] === 'Joe Burrow');
   const t = gameTotals(g).get(burrow);
   assert.equal(Math.round(dot(t, DEFAULT_PROFILE) * 100) / 100, 49.48);
+});
+
+test('public file names are URL-safe (an "@" or other encoded char makes Cloudflare redirect-loop in browsers)', () => {
+  const bad = [];
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir)) {
+      const full = `${dir}/${name}`;
+      if (!/^[A-Za-z0-9._-]+$/.test(name)) bad.push(full);
+      if (fs.statSync(full).isDirectory()) walk(full);
+    }
+  };
+  walk('public');
+  assert.deepEqual(bad, []);
 });

@@ -44,7 +44,7 @@ const cards = (page) => page.locator('.pcard.play').count();
 const shot = async (page, name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png` });
 
 // Oracle: the game file itself (only used by the test to know what must NOT be on screen yet).
-const gameFile = await (await fetch(`${BASE}/data/pbp/2026/8/TEN@CIN.json`)).json();
+const gameFile = await (await fetch(`${BASE}/data/pbp/2026/8/TEN-CIN.json`)).json();
 const plays = gameFile.plays;
 ok(plays.length > 10, `test oracle loaded (${plays.length} scoring plays in TEN@CIN week 8)`);
 
